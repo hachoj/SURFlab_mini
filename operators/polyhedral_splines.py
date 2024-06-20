@@ -70,6 +70,20 @@ class PolyhedralSplines(bpy.types.Operator):
 
             print("Generate patch obj time usage (sec): ", time.process_time() - start)
 
+        # Harry Test----------
+        vectors = set()
+        for vert in bm.verts[:]:
+            start = time.process_time()
+            x, y, z = list(vert.co)
+            vectors.add((x, y, z))
+            print("Generate coords time usage (sec): ", time.process_time() - start)
+        for vector in vectors:
+            start = time.process_time()
+            bpy.ops.mesh.primitive_uv_sphere_add(radius=0.0, enter_editmode=False, align='WORLD', location=(vector[0], vector[1], vector[2]), scale=(1, 1, 1))
+            bpy.ops.object.shade_smooth()
+            print("Generate spheres time usage (sec): ", time.process_time() - start)
+        # --------------------
+
         obj.select_set(True)
         bpy.context.view_layer.objects.active = obj
         Moments.execute(self, context)
@@ -110,8 +124,6 @@ def update_surface(context, obj):
     bm = bmesh.from_edit_mesh(obj.data)
     selected_verts = [v for v in bm.verts if v.select]
 
-
-
     for sv in selected_verts:
         bmesh.update_edit_mesh(obj.data)
 
@@ -149,6 +161,18 @@ def update_surface(context, obj):
                     for bc in bspline_patches.bspline_coefs:
                         PatchOperator.update_patch_obj(vpatch_names[i], bc)
                         i = i + 1
+
+    # # Adding
+    # bpy.ops.mesh.primitive_uv_sphere_add(radius=, enter_editmode=False, align='WORLD', location=(x, y, z), scale=(1, 1, 1))
+    # bpy.ops.object.shade_smooth()
+
+    # Adding primitive spheres at vertex locations
+    for vert in bm.verts:
+        print(vert)
+        x, y, z = vert.co
+        # bpy.ops.mesh.primitive_uv_sphere_add(
+        #     radius=1, enter_editmode=False, align='WORLD', location=(x, y, z), scale=(1, 1, 1))
+        # bpy.ops.object.shade_smooth()
 
     facePatchList = list(PatchTracker.fpatch_LUT)
     vertexPatchList = list(PatchTracker.vpatch_LUT)
