@@ -79,7 +79,7 @@ class PolyhedralSplines(bpy.types.Operator):
             print("Generate coords time usage (sec): ", time.process_time() - start)
         for vector in vectors:
             start = time.process_time()
-            bpy.ops.mesh.primitive_uv_sphere_add(radius=0.0, enter_editmode=False, align='WORLD', location=(vector[0], vector[1], vector[2]), scale=(1, 1, 1))
+            bpy.ops.mesh.primitive_uv_sphere_add(radius=0.05, enter_editmode=False, align='WORLD', location=(vector[0], vector[1], vector[2]), scale=(1, 1, 1))
             bpy.ops.object.shade_smooth()
             print("Generate spheres time usage (sec): ", time.process_time() - start)
         # --------------------
