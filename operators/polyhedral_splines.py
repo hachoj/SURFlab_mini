@@ -57,7 +57,7 @@ class PolyhedralSplines(bpy.types.Operator):
         bm = bmesh.new()
         bm.from_mesh(control_mesh)
         bm.verts.ensure_lookup_table()
-        bm.faces.ensure_lookup_table()
+        bm.faces.ensure_lookup_table() 
 
         patchWrappers = PatchHelper.getPatches(bm)
         for patchWrapper in patchWrappers:
@@ -70,20 +70,6 @@ class PolyhedralSplines(bpy.types.Operator):
 
             print("Generate patch obj time usage (sec): ", time.process_time() - start)
 
-        # Harry Test----------
-        vectors = set()
-        for vert in bm.verts[:]:
-            start = time.process_time()
-            x, y, z = list(vert.co)
-            vectors.add((x, y, z))
-            print("Generate coords time usage (sec): ", time.process_time() - start)
-        for vector in vectors:
-            start = time.process_time()
-            bpy.ops.mesh.primitive_uv_sphere_add(radius=0.05, enter_editmode=False, align='WORLD', location=(vector[0], vector[1], vector[2]), scale=(1, 1, 1))
-            bpy.ops.object.shade_smooth()
-            print("Generate spheres time usage (sec): ", time.process_time() - start)
-        # --------------------
-
         obj.select_set(True)
         bpy.context.view_layer.objects.active = obj
         Moments.execute(self, context)
@@ -93,7 +79,54 @@ class PolyhedralSplines(bpy.types.Operator):
         else:
             bm.to_mesh(control_mesh)
             control_mesh.update()
+        
+        bpy.app.handlers.depsgraph_update_post.append(edit_object_change_handler)
+        while input("Do you want to add control cubes to a patch? (y/n): ") != 'n':
+            control_cube_test()
 
+def control_cube_test():
+    patch_index_str = input("Enter the patch index to test (e.g., 536): ")
+    try:
+        patch_index = int(patch_index_str)
+        patch_name = "SurfPatch." + str(patch_index)
+        patch = bpy.context.scene.objects[patch_name]
+        add_control_cubes(patch)
+        print("Control cubes added to patch", patch_index)
+    except ValueError:
+        print("Invalid patch index. Please enter a number.")
+
+def create_control_cube(location, parent_obj):
+    bpy.ops.mesh.primitive_cube_add(size=0.01, enter_editmode=False, align='WORLD', location=location, scale=(1, 1, 1))
+    cube = bpy.context.active_object
+    cube.name = "ControlCube"
+    cube.parent = parent_obj
+
+def add_control_cubes(obj):
+    if obj.type != 'SURFACE':
+        print("Selected object is not a spline patch")
+        return
+    spline = obj.data.splines[0]
+    corners = [list(pt.co)[:3] for pt in list(spline.points)]
+    create_control_cube((1,1,1), obj)
+    cns = []
+    corner_1_x = (corners[0][0] + corners[1][0] + corners [3][0] + corners[4][0]) / 4
+    corner_1_y = (corners[0][1] + corners[1][1] + corners [3][1] + corners[4][1]) / 4
+    corner_1_z = (corners[0][2] + corners[1][2] + corners [3][2] + corners[4][2]) / 4
+    cns.append((corner_1_x, corner_1_y, corner_1_z))
+    corner_2_x = (corners[1][0] + corners[2][0] + corners [4][0] + corners[5][0]) / 4
+    corner_2_y = (corners[1][1] + corners[2][1] + corners [4][1] + corners[5][1]) / 4
+    corner_2_z = (corners[1][2] + corners[2][2] + corners [4][2] + corners[5][2]) / 4
+    cns.append((corner_2_x, corner_2_y, corner_2_z))
+    corner_3_x = (corners[3][0] + corners[4][0] + corners [6][0] + corners[7][0]) / 4
+    corner_3_y = (corners[3][1] + corners[4][1] + corners [6][1] + corners[7][1]) / 4
+    corner_3_z = (corners[3][2] + corners[4][2] + corners [6][2] + corners[7][2]) / 4
+    cns.append((corner_3_x, corner_3_y, corner_3_z))
+    corner_4_x = (corners[4][0] + corners[5][0] + corners [7][0] + corners[8][0]) / 4
+    corner_4_y = (corners[4][1] + corners[5][1] + corners [7][1] + corners[8][1]) / 4
+    corner_4_z = (corners[4][2] + corners[5][2] + corners [7][2] + corners[8][2]) / 4
+    cns.append((corner_4_x, corner_4_y, corner_4_z))
+    for corner_x, corner_y, corner_z in cns:
+        create_control_cube((corner_x, corner_y, corner_z), obj)
 
 # if previous mode is not edit, switching to edit has no need to update surface
 class Mode:
@@ -162,20 +195,7 @@ def update_surface(context, obj):
                         PatchOperator.update_patch_obj(vpatch_names[i], bc)
                         i = i + 1
 
-    # # Adding
-    # bpy.ops.mesh.primitive_uv_sphere_add(radius=, enter_editmode=False, align='WORLD', location=(x, y, z), scale=(1, 1, 1))
-    # bpy.ops.object.shade_smooth()
-
-    # Adding primitive spheres at vertex locations
-    for vert in bm.verts:
-        print(vert)
-        x, y, z = vert.co
-        # bpy.ops.mesh.primitive_uv_sphere_add(
-        #     radius=1, enter_editmode=False, align='WORLD', location=(x, y, z), scale=(1, 1, 1))
-        # bpy.ops.object.shade_smooth()
-
     facePatchList = list(PatchTracker.fpatch_LUT)
     vertexPatchList = list(PatchTracker.vpatch_LUT)
-
 
 bpy.app.handlers.depsgraph_update_post.append(edit_object_change_handler)
