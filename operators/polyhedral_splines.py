@@ -57,7 +57,7 @@ class PolyhedralSplines(bpy.types.Operator):
         bm = bmesh.new()
         bm.from_mesh(control_mesh)
         bm.verts.ensure_lookup_table()
-        bm.faces.ensure_lookup_table() 
+        bm.faces.ensure_lookup_table()
 
         patchWrappers = PatchHelper.getPatches(bm)
         for patchWrapper in patchWrappers:
@@ -79,10 +79,11 @@ class PolyhedralSplines(bpy.types.Operator):
         else:
             bm.to_mesh(control_mesh)
             control_mesh.update()
-        
+
         bpy.app.handlers.depsgraph_update_post.append(edit_object_change_handler)
         while input("Do you want to add control cubes to a patch? (y/n): ") != 'n':
             control_cube_test()
+
 
 def control_cube_test():
     patch_index_str = input("Enter the patch index to test (e.g., 536): ")
@@ -95,38 +96,75 @@ def control_cube_test():
     except ValueError:
         print("Invalid patch index. Please enter a number.")
 
+
 def create_control_cube(location, parent_obj):
     bpy.ops.mesh.primitive_cube_add(size=0.01, enter_editmode=False, align='WORLD', location=location, scale=(1, 1, 1))
     cube = bpy.context.active_object
     cube.name = "ControlCube"
     cube.parent = parent_obj
 
+
 def add_control_cubes(obj):
     if obj.type != 'SURFACE':
         print("Selected object is not a spline patch")
         return
     spline = obj.data.splines[0]
-    corners = [list(pt.co)[:3] for pt in list(spline.points)]
-    create_control_cube((1,1,1), obj)
-    cns = []
-    corner_1_x = (corners[0][0] + corners[1][0] + corners [3][0] + corners[4][0]) / 4
-    corner_1_y = (corners[0][1] + corners[1][1] + corners [3][1] + corners[4][1]) / 4
-    corner_1_z = (corners[0][2] + corners[1][2] + corners [3][2] + corners[4][2]) / 4
-    cns.append((corner_1_x, corner_1_y, corner_1_z))
-    corner_2_x = (corners[1][0] + corners[2][0] + corners [4][0] + corners[5][0]) / 4
-    corner_2_y = (corners[1][1] + corners[2][1] + corners [4][1] + corners[5][1]) / 4
-    corner_2_z = (corners[1][2] + corners[2][2] + corners [4][2] + corners[5][2]) / 4
-    cns.append((corner_2_x, corner_2_y, corner_2_z))
-    corner_3_x = (corners[3][0] + corners[4][0] + corners [6][0] + corners[7][0]) / 4
-    corner_3_y = (corners[3][1] + corners[4][1] + corners [6][1] + corners[7][1]) / 4
-    corner_3_z = (corners[3][2] + corners[4][2] + corners [6][2] + corners[7][2]) / 4
-    cns.append((corner_3_x, corner_3_y, corner_3_z))
-    corner_4_x = (corners[4][0] + corners[5][0] + corners [7][0] + corners[8][0]) / 4
-    corner_4_y = (corners[4][1] + corners[5][1] + corners [7][1] + corners[8][1]) / 4
-    corner_4_z = (corners[4][2] + corners[5][2] + corners [7][2] + corners[8][2]) / 4
-    cns.append((corner_4_x, corner_4_y, corner_4_z))
-    for corner_x, corner_y, corner_z in cns:
-        create_control_cube((corner_x, corner_y, corner_z), obj)
+    four_corners = get_control_points(spline)
+    # TODO: some of these patches are calculate with more than 9 control points
+    # for example, patch 100 has 16 control points but in the calculation, only 9 control points are used
+    # need to find a way to automatically compute the correct averages with a function
+    # that takes in the number of control points to get the correct averages for the corners
+    # back into 4 corners no matter the amount of control points
+    for corner in four_corners:
+        create_control_cube(corner, obj)
+
+
+def get_control_points(spline):
+    control_points = [list(pt.co)[:] for pt in list(spline.points)]
+    four_corners = []
+    sub_control_points = []
+    square_length = math.sqrt(len(control_points))
+    subgrids = find_subgrids(int(square_length))
+    for subgrid in subgrids:
+        x, y, z = 0, 0, 0
+        for row in subgrid:
+            for point in row:
+                x += control_points[point][0] * control_points[point][3]
+                y += control_points[point][1] * control_points[point][3]
+                z += control_points[point][2] * control_points[point][3]
+        num_sub_points = (square_length - 1) ** 2
+        x /= num_sub_points
+        y /= num_sub_points
+        z /= num_sub_points
+        four_corners.append((x, y, z))
+    return four_corners
+
+
+def find_subgrids(n):
+    subgrids = []
+
+    # Helper function to get the node label at a given row and column
+    def get_node(row, col):
+        return row + col * n
+
+    # Top-left subgrid
+    top_left = [[get_node(row, col) for col in range(n - 1)] for row in range(1, n)]
+    subgrids.append(top_left)
+
+    # Top-right subgrid
+    top_right = [[get_node(row, col) for col in range(1, n)] for row in range(1, n)]
+    subgrids.append(top_right)
+
+    # Bottom-left subgrid
+    bottom_left = [[get_node(row, col) for col in range(n - 1)] for row in range(n - 1)]
+    subgrids.append(bottom_left)
+
+    # Bottom-right subgrid
+    bottom_right = [[get_node(row, col) for col in range(1, n)] for row in range(n - 1)]
+    subgrids.append(bottom_right)
+
+    return subgrids
+
 
 # if previous mode is not edit, switching to edit has no need to update surface
 class Mode:
@@ -197,5 +235,6 @@ def update_surface(context, obj):
 
     facePatchList = list(PatchTracker.fpatch_LUT)
     vertexPatchList = list(PatchTracker.vpatch_LUT)
+
 
 bpy.app.handlers.depsgraph_update_post.append(edit_object_change_handler)

@@ -11,7 +11,7 @@ from .operators.ui_exporter import IGSExporter
 bl_info = {
     "name": "polyhedral_splines",
     "description": "An interactive spline generation addon",
-    "version": (1, 0, 0),
+    "version": (1, 0, 1),
     "blender": (2, 80, 2),
     "category": "Modeling"
 }
