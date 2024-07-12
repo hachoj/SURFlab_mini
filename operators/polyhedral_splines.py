@@ -45,6 +45,8 @@ class PolyhedralSplines(bpy.types.Operator):
 
         self.__init_patch_obj__(context)
         bpy.ops.ui.reloadtranslation()
+
+        bpy.context.scene.polyhedral_splines_finished = True
         return {'FINISHED'}
 
     def __init_patch_obj__(self, context):
@@ -81,12 +83,10 @@ class PolyhedralSplines(bpy.types.Operator):
             control_mesh.update()
 
         bpy.app.handlers.depsgraph_update_post.append(edit_object_change_handler)
-        while input("Do you want to add control cubes to a patch? (y/n): ") != 'n':
-            control_cube_test()
 
 
-def control_cube_test():
-    patch_index_str = input("Enter the patch index to test (e.g., 536): ")
+def control_cube_test(patch_index_str):
+    # patch_index_str = input("Enter the patch index to test (e.g., 536): ")
     try:
         patch_index = int(patch_index_str)
         patch_name = "SurfPatch." + str(patch_index)
@@ -177,14 +177,46 @@ prev_mode = 'OBJECT'
 
 
 @persistent
-def edit_object_change_handler(context):
+def edit_object_change_handler(scene, context):
     obj = bpy.context.active_object
+
+    if scene.previous_object:
+        prev_obj = scene.previous_object
+    else:
+        prev_obj = None
+
+    # Update the previously selected object
+    scene.previous_object = obj
 
     if obj is None:
         return None
 
+    if bpy.context.scene.polyhedral_splines_finished:
+        if obj.type == 'SURFACE':
+            # print("PolyhedralSplines has finished, and a surface is selected")
+            if prev_obj != obj:
+                print("PolyhedralSplines has finished, and a new surface is selected")
+                #print("new")
+                #while input("Do you want to add control cubes to a patch? (y/n): ") != 'n':
+                    # print(obj.name)
+                    # Split the string by '.' and take the second part
+                patch_index_str = obj.name.split('.')[1]
+                control_cube_test(patch_index_str)
+
+
     if obj.mode == 'EDIT' and Mode.prev == 'EDIT' and obj.type == 'MESH':
         update_surface(context, obj)
+
+
+
+    '''
+    if obj.type == 'SURFACE':
+        print("You selected a surface")
+    if obj.type == 'MESH':
+        print("You selected a mesh")
+    print(obj.type, "inbetween")
+    print("in function")
+    '''
 
     Mode.prev = obj.mode
 
@@ -238,3 +270,5 @@ def update_surface(context, obj):
 
 
 bpy.app.handlers.depsgraph_update_post.append(edit_object_change_handler)
+bpy.types.Scene.polyhedral_splines_finished = bpy.props.BoolProperty(default=False)
+bpy.types.Scene.previous_object = bpy.props.PointerProperty(type=bpy.types.Object)
