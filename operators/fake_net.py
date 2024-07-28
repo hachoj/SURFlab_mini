@@ -16,7 +16,7 @@ class Fake_Net(bpy.types.Operator):
         obj = context.active_object
         selected = context.selected_objects
 
-        if obj in selected and obj.mode == "OBJECT" and obj.type == "MESH":
+        if obj in selected and obj.mode == "OBJECT" and obj.type == "MESH" and PolyhedralSplines.polyhedral_splines_finished:
             return True
         return False
 
