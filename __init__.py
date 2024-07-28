@@ -7,11 +7,12 @@ from .operators.ui_color import COLOR_OT_TemplateOperator
 from .operators.moments import Moments
 from .operators.subdivide_mesh import SubdivideMesh
 from .operators.ui_exporter import IGSExporter
+from .operators.fake_net import Fake_Net
 
 bl_info = {
     "name": "polyhedral_splines",
     "description": "An interactive spline generation addon",
-    "version": (1, 0, 0),
+    "version": (1, 0, 3),
     "blender": (2, 80, 2),
     "category": "Modeling"
 }
@@ -25,7 +26,8 @@ classes = (
     COLOR_OT_TemplateOperator,
     IGSExporter,
     Moments,
-    SubdivideMesh
+    SubdivideMesh,
+    Fake_Net
 )
 
 register, unregister = bpy.utils.register_classes_factory(classes)

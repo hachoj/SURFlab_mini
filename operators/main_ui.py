@@ -4,6 +4,7 @@ from .polyhedral_splines import PolyhedralSplines
 from .ui_color import COLOR_OT_TemplateOperator
 from .moments import Moments
 from .ui_helper import ToggleFaces, ToggleSurfPatchCollection
+from .fake_net import Fake_Net
 import bpy
 
 
@@ -28,6 +29,7 @@ class MainUI(bpy.types.Panel):
         calculationBox.operator(operator=PolyhedralSplines.bl_idname, text="Generate Bspline Patches")
         calculationBox.operator(operator=SubdivideMesh.bl_idname, text="Subdivide Mesh")
         calculationBox.operator(operator=Moments.bl_idname, text="Calculate Moments")
+        calculationBox.operator(operator=Fake_Net.bl_idname, text="Create Fake Net")
 
         viewBox = layout.box()
         viewBox.label(text="View")
