@@ -12,7 +12,7 @@ from .operators.fake_net import Fake_Net
 bl_info = {
     "name": "polyhedral_splines",
     "description": "An interactive spline generation addon",
-    "version": (1, 0, 3),
+    "version": (1, 0, 2),
     "blender": (2, 80, 2),
     "category": "Modeling"
 }

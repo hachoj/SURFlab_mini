@@ -5,9 +5,10 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="ea10214a-e267-4c0c-a26e-b848a45269e1" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/operators/fake_net.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/__init__.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/operators/main_ui.py" beforeDir="false" afterPath="$PROJECT_DIR$/operators/main_ui.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/operators/fake_net.py" beforeDir="false" afterPath="$PROJECT_DIR$/operators/fake_net.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/operators/polyhedral_splines.py" beforeDir="false" afterPath="$PROJECT_DIR$/operators/polyhedral_splines.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -66,7 +67,7 @@
       <workItem from="1721343792240" duration="621000" />
       <workItem from="1721527843431" duration="130000" />
       <workItem from="1722136259792" duration="2731000" />
-      <workItem from="1722180694411" duration="3483000" />
+      <workItem from="1722180694411" duration="10805000" />
     </task>
     <servers />
   </component>
