@@ -84,7 +84,7 @@ class PolyhedralSplines(bpy.types.Operator):
                 bpy.context.scene.objects[patch_name].parent = obj
                 # save the corner coordinates of the patch
                 # bpy.context.scene.objects[patch_name].corner_coords = patchWrapper.patch.corner_coords
-                verts.update({patch_name : patchWrapper.patch.corner_coords})
+                verts.update({patch_name : (patchWrapper.patch.struct_name, patchWrapper.patch.corner_coords)})
 
             print("Generate patch obj time usage (sec): ", time.process_time() - start)
 
@@ -100,19 +100,8 @@ class PolyhedralSplines(bpy.types.Operator):
         
         bpy.app.handlers.depsgraph_update_post.append(edit_object_change_handler)
         # print(len(PatchTracker.patch_names))
-        if input("Coverage Test? (y/n): ") != 'n':
-            coverage_test()
-
-# def coverage_test(): 
-#     i = 0
-#     for key, val in verts.items():
-#         i += 1
-#         if i % 50 == 0:
-#             print(f"Patch {i}")
-#         if val != []:
-#             for corner in val:
-#                 coords = tuple(corner)
-#                 create_control_cube(coords, bpy.context.scene.objects[key])
+        # if input("Coverage Test? (y/n): ") != 'n':
+        #     coverage_test()
                 
 def coverage_test(): 
     if input("full test? (y/n): ") != 'n':
@@ -145,26 +134,45 @@ def coverage_test():
                 coords = tuple(corner)
                 create_control_cube(coords, bpy.context.scene.objects[patch_name])
 
-
-def control_cube_test(patch_index_str):
+def distance(c1, c2):
+    return ((c1[0]-c2[0])**2 + (c1[1]-c2[1])**2 + (c1[2]-c2[2])**2)**0.5
+def control_cube_test(patch_index_str, approx_center):
     try:
         patch_index = int(patch_index_str)
-        patch_name = "SurfPatch." + str(patch_index)
+        if patch_index < 100:
+            patch_index = "0" + str(patch_index)
+        else:
+            patch_index = str(patch_index)
+        patch_name = "SurfPatch." + patch_index
         # patch = bpy.context.scene.objects[patch_name]
         # add_control_cubes(patch) #TODO:
-        corners = verts[patch_name]
-        if corners != []:
-            for corner in corners:
-                coords = tuple(corner)
-                create_control_cube(coords, bpy.context.scene.objects[patch_name])
-            print("Control cubes added to patch", patch_index)
+
+        # calculate the true corners through an approximate center to each patch
+        # TODO: this was a fun approach but it's not working as intended
+        type, all_corners = verts[patch_name]   
+        num_corners = 0
+        distances = dict()
+        true_corners = []
+        if type == "Polar":
+            num_corners = 3
         else:
-            print("No corner coordinates found for patch", patch_index)
-        # print("Control cubes added to patch", patch_index)
+            num_corners = 4
+        for corner in all_corners:
+            corner = tuple(round(coord, 5) for coord in corner)
+            distances[corner] = distance(corner, approx_center)
+        if num_corners == 3:
+            true_corners = [corner for corner, _ in sorted(distances.items(), key=lambda x: x[1])[:3] if corner not in true_corners]
+        elif num_corners == 4:
+            true_corners = [corner for corner, _ in sorted(distances.items(), key=lambda x: x[1])[:4] if corner not in true_corners]
+
+        for corner in true_corners:
+            coords = tuple(corner)
+            create_control_cube(coords, bpy.context.scene.objects[patch_name])
+
+        print("Control cubes added to patch", patch_index)
     except ValueError:
         print("Invalid patch index. Please enter a number.")
-
-    
+ 
 def create_control_cube(location, parent_obj=None):
     bpy.ops.mesh.primitive_cube_add(size=0.01, enter_editmode=False, align='WORLD', location=location, scale=(1, 1, 1))
     cube = bpy.context.active_object
@@ -200,17 +208,21 @@ def edit_object_change_handler(scene, context):
     if obj is None:
         return None
 
-    if bpy.context.scene.polyhedral_splines_finished:
-        if obj.type == 'SURFACE':
-            # print("PolyhedralSplines has finished, and a surface is selected")
-            if prev_obj != obj:
-                print("PolyhedralSplines has finished, and a new surface is selected")
-                #print("new")
-                #while input("Do you want to add control cubes to a patch? (y/n): ") != 'n':
-                    # print(obj.name)
-                    # Split the string by '.' and take the second part
-                patch_index_str = obj.name.split('.')[1]
-                control_cube_test(patch_index_str)
+    # if bpy.context.scene.polyhedral_splines_finished:
+    #     if obj.type == 'SURFACE':
+    #         # print("PolyhedralSplines has finished, and a surface is selected")
+    #         if prev_obj != obj:
+    #             print("PolyhedralSplines has finished, and a new surface is selected")
+    #             spline = obj.data.splines[0]
+    #             control_points = [pt.co for pt in spline.points]
+
+    #             approx_center = numpy.mean(control_points, axis=0)[:3]
+    #             #print("new")
+    #             #while input("Do you want to add control cubes to a patch? (y/n): ") != 'n':
+    #                 # print(obj.name)
+    #                 # Split the string by '.' and take the second part
+    #             patch_index_str = obj.name.split('.')[1]
+    #             control_cube_test(patch_index_str, approx_center)
 
 
     if obj.mode == 'EDIT' and Mode.prev == 'EDIT' and obj.type == 'MESH':

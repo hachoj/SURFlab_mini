@@ -58,7 +58,6 @@ class PatchHelper:
 
         # harry addition
         for patchWrapper in patchWrappers:
-            # patchWrapper.patch.corner_coords = (1, 1, 1)
             patchWrapper.patch.corner_coords = PatchHelper.calculate_corner_coords(PatchHelper, patchWrapper)
 
 
@@ -101,7 +100,7 @@ class PatchHelper:
         """
         corner_coords = []
         if(patchWrapper.patch.struct_name == "Regular"):
-            # THIeS ONE WORKS
+            # THIS ONE WORKS
             nb_verts = patchWrapper.neighbors
             corner_coords.append(np.mean(Helper.convert_verts_from_list_to_matrix([nb_verts[0], nb_verts[1], nb_verts[3], nb_verts[4]]), axis=0))   #Corner 0
             corner_coords.append(np.mean(Helper.convert_verts_from_list_to_matrix([nb_verts[1], nb_verts[2], nb_verts[4], nb_verts[5]]), axis=0))   #Corner 1
@@ -109,127 +108,70 @@ class PatchHelper:
             corner_coords.append(np.mean(Helper.convert_verts_from_list_to_matrix([nb_verts[4], nb_verts[5], nb_verts[7], nb_verts[8]]), axis=0))   #Corner 3
             # pass
         elif (patchWrapper.patch.struct_name == "EOP"):
+            # THIS ONE WORKS
             nb_verts = patchWrapper.neighbors
             valence = len(patchWrapper.source.link_edges)
             mask = Reader.csv_to_masks(["eopSct{}".format(valence)])["eopSct{}".format(valence)]
             bezier_coefs = Helper.apply_mask_on_neighbor_verts(mask, nb_verts)
-            if(valence == 3):
-                # THIS ONE WORKS
-                for i in range(0, 32, 16):
-                    corner_coords.append(bezier_coefs[i])
-                    corner_coords.append(bezier_coefs[i+3])
-                    corner_coords.append(bezier_coefs[i+12])
-                    corner_coords.append(bezier_coefs[i+15])
-                # pass
-            elif(valence == 5):
-                # THIS ONE WORKS
-                for i in range(0, 64, 16):
-                    corner_coords.append(bezier_coefs[i])
-                    corner_coords.append(bezier_coefs[i+3])
-                    corner_coords.append(bezier_coefs[i+12])
-                    corner_coords.append(bezier_coefs[i+15])
-                # pass
-            elif(valence == 6):
-                # THIS ONE WORKS
-                for i in range(0, 368, 16):
-                    corner_coords.append(bezier_coefs[i])
-                    corner_coords.append(bezier_coefs[i+3])
-                    corner_coords.append(bezier_coefs[i+12])
-                    corner_coords.append(bezier_coefs[i+15])
-                # pass
-            elif(valence == 7):
-                # THIS ONE WORKS
-                for i in range(0, 432, 16):
-                    corner_coords.append(bezier_coefs[i])
-                    corner_coords.append(bezier_coefs[i+3])
-                    corner_coords.append(bezier_coefs[i+12])
-                    corner_coords.append(bezier_coefs[i+15])
-                # pass
-            elif(valence == 8):
-                # THIS ONE WORKS
-                for i in range(0, 496, 16):
-                    corner_coords.append(bezier_coefs[i])
-                    corner_coords.append(bezier_coefs[i+3])
-                    corner_coords.append(bezier_coefs[i+12])
-                    corner_coords.append(bezier_coefs[i+15])
-                # pass
+            for coef in range(0, len(bezier_coefs)-16, 16):
+                corner_coords.append(bezier_coefs[coef])
+                corner_coords.append(bezier_coefs[coef+3])
+                corner_coords.append(bezier_coefs[coef+12])
+                corner_coords.append(bezier_coefs[coef+15])
         elif(patchWrapper.patch.struct_name == "Polar"):
+            # THIS ONE WORKS
             nb_verts = patchWrapper.neighbors
-            valence = len(nb_verts) - 1   #Dont include central vert
+            valence = len(patchWrapper.source.link_edges)
             mask = Reader.csv_to_masks(["polarSct{}".format(valence)])["polarSct{}".format(valence)]
             bezier_coefs = Helper.apply_mask_on_neighbor_verts(mask, nb_verts)
-            if(valence == 3):
-                # THIS ONE WORKS
-                # center
-                corner_coords.append(bezier_coefs[0])
-                # outside
-                for i in range(9, 48, 12):
-                    corner_coords.append(bezier_coefs[i])
-                # pass
-            elif(valence == 5):
-                # THIS ONE WORKS
-                # center
-                corner_coords.append(bezier_coefs[0])
-                # outside
-                for i in range(9, 96, 12):
-                    corner_coords.append(bezier_coefs[i])
-                # pass
-            elif(valence == 6):
-                # THIS ONE WORKS
-                # center
-                corner_coords.append(bezier_coefs[0])
-                # outside
-                for i in range(9, 96, 12):
-                    corner_coords.append(bezier_coefs[i])
-                # pass
-            elif(valence == 7):
-                # THIS ONE WORKS
-                # center
-                corner_coords.append(bezier_coefs[0])
-                # outside
-                for i in range(9, 96, 12):
-                    corner_coords.append(bezier_coefs[i])
-                # pass
-            elif(valence == 8):
-                # THIS ONE WORKS
-                # center
-                corner_coords.append(bezier_coefs[0])
-                # outside
-                for i in range(9, 96, 12):
-                    corner_coords.append(bezier_coefs[i])
-                # pass
-        # elif(patchWrapper.patch.struct_name == "T0"):
-        #     print("T0")
-        #     nb_verts = patchWrapper.neighbors
-        #     corner_coords.append(np.mean(Helper.convert_verts_from_list_to_matrix([nb_verts[0], nb_verts[1], nb_verts[3], nb_verts[4]]), axis=0))   #Corner 0
-        #     corner_coords.append(np.mean(Helper.convert_verts_from_list_to_matrix([nb_verts[2], nb_verts[3], nb_verts[5], nb_verts[6]]), axis=0))   #Corner 1
-        #     corner_coords.append(np.mean(Helper.convert_verts_from_list_to_matrix([nb_verts[6], nb_verts[7], nb_verts[9], nb_verts[10]]), axis=0))   #Corner 2
-        #     corner_coords.append(np.mean(Helper.convert_verts_from_list_to_matrix([nb_verts[8], nb_verts[9], nb_verts[11], nb_verts[12]]), axis=0))   #Corner 3
-        # elif(patchWrapper.patch.struct_name == "T1"):
-        #     print("T1")
-        #     nb_verts = patchWrapper.neighbors
-        #     corner_coords.append(np.mean(Helper.convert_verts_from_list_to_matrix([nb_verts[0], nb_verts[1], nb_verts[3], nb_verts[4]]), axis=0))   #Corner 0
-        #     corner_coords.append(np.mean(Helper.convert_verts_from_list_to_matrix([nb_verts[2], nb_verts[3], nb_verts[5], nb_verts[6]]), axis=0))   #Corner 1
-        #     corner_coords.append(np.mean(Helper.convert_verts_from_list_to_matrix([nb_verts[8], nb_verts[9], nb_verts[11], nb_verts[12]]), axis=0))   #Corner 2
-        #     corner_coords.append(np.mean(Helper.convert_verts_from_list_to_matrix([nb_verts[10], nb_verts[11], nb_verts[13], nb_verts[14]]), axis=0))   #Corner 3
-        # elif(patchWrapper.patch.struct_name == "T2"):
-        #     print("T2")
-        #     nb_verts = patchWrapper.neighbors
-        #     corner_coords.append(np.mean(Helper.convert_verts_from_list_to_matrix([nb_verts[0], nb_verts[1], nb_verts[3], nb_verts[4]]), axis=0))   #Corner 0
-        #     corner_coords.append(np.mean(Helper.convert_verts_from_list_to_matrix([nb_verts[2], nb_verts[3], nb_verts[5], nb_verts[6]]), axis=0))   #Corner 1
-        #     corner_coords.append(np.mean(Helper.convert_verts_from_list_to_matrix([nb_verts[10], nb_verts[11], nb_verts[13], nb_verts[14]]), axis=0))   #Corner 2
-        #     corner_coords.append(np.mean(Helper.convert_verts_from_list_to_matrix([nb_verts[12], nb_verts[13], nb_verts[15], nb_verts[16]]), axis=0))   #Corner 3
-        # elif(patchWrapper.patch.struct_name == "n-gon"):
-        #     nb_verts = patchWrapper.neighbors
-        #     corner_coords.append(np.mean(Helper.convert_verts_from_list_to_matrix([nb_verts[0], nb_verts[1], nb_verts[3], nb_verts[4]]), axis=0))   #Corner 0
-        #     corner_coords.append(np.mean(Helper.convert_verts_from_list_to_matrix([nb_verts[2], nb_verts[3], nb_verts[5], nb_verts[6]]), axis=0))   #Corner 1
-        #     corner_coords.append(np.mean(Helper.convert_verts_from_list_to_matrix([nb_verts[8], nb_verts[9], nb_verts[11], nb_verts[12]]), axis=0))   #Corner 2
-        #     corner_coords.append(np.mean(Helper.convert_verts_from_list_to_matrix([nb_verts[10], nb_verts[11], nb_verts[13], nb_verts[14]]), axis=0))   #Corner 3
-        # elif(patchWrapper.patch.struct_name == "2T2Q"):
-        #     print("2T2Q")
-        #     nb_verts = patchWrapper.neighbors
-        #     corner_coords.append(np.mean(Helper.convert_verts_from_list_to_matrix([nb_verts[0], nb_verts[1], nb_verts[3], nb_verts[4]]), axis=0))   #Corner 0
-        #     corner_coords.append(np.mean(Helper.convert_verts_from_list_to_matrix([nb_verts[2], nb_verts[3], nb_verts[5], nb_verts[6]]), axis=0))   #Corner 1
-        #     corner_coords.append(np.mean(Helper.convert_verts_from_list_to_matrix([nb_verts[6], nb_verts[7], nb_verts[8], nb_verts[4]]), axis=0))   #Corner 2
-        #     corner_coords.append(np.mean(Helper.convert_verts_from_list_to_matrix([nb_verts[0], nb_verts[1], nb_verts[4], nb_verts[7]]), axis=0))   #Corner 3
+            corner_coords.append(bezier_coefs[0])
+            for i in range(9, len(bezier_coefs), 12):
+                corner_coords.append(bezier_coefs[i])
+        elif(patchWrapper.patch.struct_name == "T0"):
+            # THIS ONE WORKS
+            nb_verts = patchWrapper.neighbors
+            mask = Reader.csv_to_masks(["T0"])["T0"]
+            bezier_coefs = Helper.apply_mask_on_neighbor_verts(mask, nb_verts)
+            for coef in range(0, len(bezier_coefs)-16, 16):
+                corner_coords.append(bezier_coefs[coef])
+                corner_coords.append(bezier_coefs[coef+3])
+                corner_coords.append(bezier_coefs[coef+12])
+                corner_coords.append(bezier_coefs[coef+15])
+        elif(patchWrapper.patch.struct_name == "T1"):
+            # THIS ONE WORKS
+            nb_verts = patchWrapper.neighbors
+            mask = Reader.csv_to_masks(["T1"])["T1"]
+            bezier_coefs = Helper.apply_mask_on_neighbor_verts(mask, nb_verts)
+            for coef in range(0, len(bezier_coefs)-16, 16):
+                corner_coords.append(bezier_coefs[coef])
+                corner_coords.append(bezier_coefs[coef+3])
+                corner_coords.append(bezier_coefs[coef+12])
+                corner_coords.append(bezier_coefs[coef+15])
+        elif(patchWrapper.patch.struct_name == "T2"):
+            # THIS ONE WORKS
+            nb_verts = patchWrapper.neighbors
+            mask = Reader.csv_to_masks(["T2"])["T2"]
+            bezier_coefs = Helper.apply_mask_on_neighbor_verts(mask, nb_verts)
+            for coef in range(0, len(bezier_coefs)-16, 16):
+                corner_coords.append(bezier_coefs[coef])
+                corner_coords.append(bezier_coefs[coef+3])
+                corner_coords.append(bezier_coefs[coef+12])
+                corner_coords.append(bezier_coefs[coef+15])
+        elif(patchWrapper.patch.struct_name == "n-gon"):
+            # THIS ONE WORKS
+            nb_verts = patchWrapper.neighbors
+            valence = Helper.edges_number_of_face(patchWrapper.source)
+            mask = Reader.csv_to_masks(["ngonSct{}".format(valence)])["ngonSct{}".format(valence)]
+            bezier_coefs = Helper.apply_mask_on_neighbor_verts(mask, nb_verts)
+            for coef in range(0, len(bezier_coefs)-16, 16):
+                corner_coords.append(bezier_coefs[coef])
+                corner_coords.append(bezier_coefs[coef+3])
+                corner_coords.append(bezier_coefs[coef+12])
+                corner_coords.append(bezier_coefs[coef+15])
+        elif(patchWrapper.patch.struct_name == "2T2Q"):
+            nb_verts = patchWrapper.neighbors
+            corner_coords.append(np.mean(Helper.convert_verts_from_list_to_matrix([nb_verts[0], nb_verts[1], nb_verts[3], nb_verts[4]]), axis=0))   #Corner 0
+            corner_coords.append(np.mean(Helper.convert_verts_from_list_to_matrix([nb_verts[1], nb_verts[2], nb_verts[4], nb_verts[5]]), axis=0))   #Corner 1
+            corner_coords.append(np.mean(Helper.convert_verts_from_list_to_matrix([nb_verts[3], nb_verts[4], nb_verts[6], nb_verts[7]]), axis=0))   #Corner 2
+            corner_coords.append(np.mean(Helper.convert_verts_from_list_to_matrix([nb_verts[4], nb_verts[5], nb_verts[7], nb_verts[8]]), axis=0))   #Corner 3
         return corner_coords 
