@@ -16,13 +16,14 @@ import math
 # Debug
 import time
 
-verts = {}
 tups = []
 
 class PolyhedralSplines(bpy.types.Operator):
     bl_label = "Interactive Modeling"
     bl_idname = "object.polyhedral_splines"
     bl_description = "Generates polyhedral spline mesh. Some mesh configurations are not supported, subdivide the mesh beforehand if this is the case"
+    polyhedral_splines_finished = False
+    patch_to_corners = {}
 
     def __init__(self):
         print("Start")
@@ -60,6 +61,7 @@ class PolyhedralSplines(bpy.types.Operator):
         bpy.ops.ui.reloadtranslation()
 
         bpy.context.scene.polyhedral_splines_finished = True
+        PolyhedralSplines.polyhedral_splines_finished = True
         return {'FINISHED'}
 
     def __init_patch_obj__(self, context):
@@ -84,7 +86,7 @@ class PolyhedralSplines(bpy.types.Operator):
                 bpy.context.scene.objects[patch_name].parent = obj
                 # save the corner coordinates of the patch
                 # bpy.context.scene.objects[patch_name].corner_coords = patchWrapper.patch.corner_coords
-                verts.update({patch_name : (patchWrapper.patch.struct_name, patchWrapper.patch.corner_coords)})
+                PolyhedralSplines.patch_to_corners.update({patch_name : (patchWrapper.patch.struct_name, patchWrapper.patch.corner_coords)})
 
             print("Generate patch obj time usage (sec): ", time.process_time() - start)
 
@@ -99,90 +101,92 @@ class PolyhedralSplines(bpy.types.Operator):
             control_mesh.update()
         
         bpy.app.handlers.depsgraph_update_post.append(edit_object_change_handler)
-        # print(len(PatchTracker.patch_names))
-        # if input("Coverage Test? (y/n): ") != 'n':
-        #     coverage_test()
                 
-def coverage_test(): 
-    if input("full test? (y/n): ") != 'n':
-        for key, val in verts.items():
-            if val != []:
-                for corner in val:
-                    coords = tuple(corner)
-                    tups.append((coords, key))
-        new_tups = []    
-        for tup in tups:
-            if tup[0] not in [t[0] for t in new_tups]:
-                new_tups.append((tup[0], tup[1]))
-        print(f"Number of total patches: {len(tups)}")
-        print(f"Number of unique patches: {len(new_tups)}")
-        i = 0
-        for tup in new_tups:
-            i += 1
-            if i % 50 == 0:
-                print(f"Patch {i}/{len(new_tups)}")
-            create_control_cube(tup[0], bpy.context.scene.objects[tup[1]])
-    else:
-        for key, item in verts.items():
-            if item != []:
-                print(key, end=', ')
-        patch_index = 'y'
-        while patch_index != 'n':
-            patch_index = input("Enter patch index: ")
+    def get_verts(): 
+        if input("full test? (y/n): ") != 'n':
+            for key, val in PolyhedralSplines.patch_to_corners.items():
+                # corner[1] is the corner coordinates because
+                # corner[0] is the type of contructed patch
+                coords = tuple(val[1])
+                tups.append((coords, key))
+            no_dupes_tups = []
+            seen_coords = set()
+            for coords, key in tups:
+
+                # -----------------------------------
+                # this block of code converts the coordinates into a tuple
+                # from a numpy array so it can be hashed and checked for duplicates
+                check_coords = []
+                for cord in coords:
+                    check_coords.extend(list(cord))
+                check_coords = tuple(check_coords)
+                # -----------------------------------
+
+                if check_coords not in seen_coords:
+                    no_dupes_tups.append((coords, key))
+                    seen_coords.add(check_coords)
+                
+            # -----------------------------------
+            # just to find the amount of control points
+            total_control_points = 0
+            unique_control_points = 0
+            for corners, constructor in tups:
+                for corner in corners:
+                    total_control_points += 1
+            for corners, constructor in no_dupes_tups:
+                for corner in corners:
+                    unique_control_points += 1
+            print(f"Number of total control points: {total_control_points}")
+            print(f"Number of unique control points: {unique_control_points}")
+        return no_dupes_tups
+            # -----------------------------------
+        #     i = 0
+        #     for tup in no_dupes_tups:
+        #         for corner in tup[0]:
+        #             i += 1
+        #             if i % 50 == 0:
+        #                 print(f"Patch {i}/{unique_control_points}")
+        #             PolyhedralSplines.create_control_cube(corner, bpy.context.scene.objects[tup[1]])
+        # else:
+        #     for key, item in PolyhedralSplines.patch_to_corners.items():
+        #         if item != []:
+        #             print(key, end=', ')
+        #     patch_index = 'y'
+        #     while patch_index != 'n':
+        #         patch_index = input("Enter patch index: ")
+        #         patch_name = "SurfPatch." + str(patch_index)
+        #         for corner in PolyhedralSplines.patch_to_corners[patch_name]:
+        #             coords = tuple(corner)
+        #             create_control_cube(coords, bpy.context.scene.objects[patch_name])
+
+    def control_cube_test(patch_index_str):
+        try:
+            patch_index = int(patch_index_str)
             patch_name = "SurfPatch." + str(patch_index)
-            for corner in verts[patch_name]:
-                coords = tuple(corner)
-                create_control_cube(coords, bpy.context.scene.objects[patch_name])
+            # patch = bpy.context.scene.objects[patch_name]
+            # add_control_cubes(patch) #TODO:
+            corners = PolyhedralSplines.patch_to_corners[patch_name]
+            if corners != []:
+                for corner in corners:
+                    coords = tuple(corner)
+                    create_control_cube(coords, bpy.context.scene.objects[patch_name])
+                print("Control cubes added to patch", patch_index)
+            else:
+                print("No corner coordinates found for patch", patch_index)
+            # print("Control cubes added to patch", patch_index)
+        except ValueError:
+            print("Invalid patch index. Please enter a number.") 
 
-def distance(c1, c2):
-    return ((c1[0]-c2[0])**2 + (c1[1]-c2[1])**2 + (c1[2]-c2[2])**2)**0.5
-def control_cube_test(patch_index_str, approx_center):
-    try:
-        patch_index = int(patch_index_str)
-        if patch_index < 100:
-            patch_index = "0" + str(patch_index)
+    def create_control_cube(location, parent_obj=None):
+        bpy.ops.mesh.primitive_cube_add(size=0.01, enter_editmode=False, align='WORLD', location=location, scale=(1, 1, 1))
+        cube = bpy.context.active_object
+        if parent_obj is not None:
+            name = "ControlCube." + str(parent_obj.name)
+            cube.name = name
+            cube.parent = parent_obj 
         else:
-            patch_index = str(patch_index)
-        patch_name = "SurfPatch." + patch_index
-        # patch = bpy.context.scene.objects[patch_name]
-        # add_control_cubes(patch) #TODO:
-
-        # calculate the true corners through an approximate center to each patch
-        # TODO: this was a fun approach but it's not working as intended
-        type, all_corners = verts[patch_name]   
-        num_corners = 0
-        distances = dict()
-        true_corners = []
-        if type == "Polar":
-            num_corners = 3
-        else:
-            num_corners = 4
-        for corner in all_corners:
-            corner = tuple(round(coord, 5) for coord in corner)
-            distances[corner] = distance(corner, approx_center)
-        if num_corners == 3:
-            true_corners = [corner for corner, _ in sorted(distances.items(), key=lambda x: x[1])[:3] if corner not in true_corners]
-        elif num_corners == 4:
-            true_corners = [corner for corner, _ in sorted(distances.items(), key=lambda x: x[1])[:4] if corner not in true_corners]
-
-        for corner in true_corners:
-            coords = tuple(corner)
-            create_control_cube(coords, bpy.context.scene.objects[patch_name])
-
-        print("Control cubes added to patch", patch_index)
-    except ValueError:
-        print("Invalid patch index. Please enter a number.")
- 
-def create_control_cube(location, parent_obj=None):
-    bpy.ops.mesh.primitive_cube_add(size=0.01, enter_editmode=False, align='WORLD', location=location, scale=(1, 1, 1))
-    cube = bpy.context.active_object
-    if parent_obj is not None:
-        name = "ControlCube." + str(parent_obj.name)
-        cube.name = name
-        cube.parent = parent_obj 
-    else:
-        name = "ControlCube."
-        cube.name = name
+            name = "ControlCube."
+            cube.name = name
 
 # if previous mode is not edit, switching to edit has no need to update surface
 class Mode:
