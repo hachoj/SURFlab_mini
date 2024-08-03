@@ -5,7 +5,12 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="ea10214a-e267-4c0c-a26e-b848a45269e1" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/operators/fake_net.py" beforeDir="false" afterPath="$PROJECT_DIR$/operators/fake_net.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/operators/surface_mesh.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/__init__.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/operators/fake_net.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/operators/main_ui.py" beforeDir="false" afterPath="$PROJECT_DIR$/operators/main_ui.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/operators/polyhedral_splines.py" beforeDir="false" afterPath="$PROJECT_DIR$/operators/polyhedral_splines.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -34,19 +39,19 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "RunOnceActivity.OpenProjectViewOnStart": "true",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "WebServerToolWindowFactoryState": "false",
-    "git-widget-placeholder": "richard-testing",
-    "node.js.detected.package.eslint": "true",
-    "node.js.detected.package.tslint": "true",
-    "node.js.selected.package.eslint": "(autodetect)",
-    "node.js.selected.package.tslint": "(autodetect)",
-    "vue.rearranger.settings.migration": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;RunOnceActivity.OpenProjectViewOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;WebServerToolWindowFactoryState&quot;: &quot;false&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;richard-testing&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   }
-}]]></component>
+}</component>
   <component name="RecentsManager">
     <key name="MoveFile.RECENT_KEYS">
       <recent name="C:\Users\r3car\OneDrive\Documents\GitHub\SURFlab_mini\operators" />
@@ -64,7 +69,11 @@
       <workItem from="1721343792240" duration="621000" />
       <workItem from="1721527843431" duration="130000" />
       <workItem from="1722136259792" duration="2731000" />
-      <workItem from="1722180694411" duration="11425000" />
+      <workItem from="1722180694411" duration="31904000" />
+      <workItem from="1722483883148" duration="597000" />
+      <workItem from="1722545217286" duration="1337000" />
+      <workItem from="1722644664616" duration="43000" />
+      <workItem from="1722644749760" duration="6251000" />
     </task>
     <servers />
   </component>

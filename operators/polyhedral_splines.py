@@ -16,12 +16,17 @@ import math
 # Debug
 import time
 
+tups = []
+
 class PolyhedralSplines(bpy.types.Operator):
     bl_label = "Interactive Modeling"
     bl_idname = "object.polyhedral_splines"
     bl_description = "Generates polyhedral spline mesh. Some mesh configurations are not supported, subdivide the mesh beforehand if this is the case"
     polyhedral_splines_finished = False
+    coverage_test_var = False
     verts = {}
+    wireframe_vertices = []  # new
+    patch_to_corners = {}
 
     def __init__(self):
         print("Start")
@@ -39,19 +44,6 @@ class PolyhedralSplines(bpy.types.Operator):
         return False
 
     def execute(self, context):
-        # # Check if all submeshes are supported by algorithms.
-        # # Subdivide the mesh if not.
-        # if Highlighter.is_subdivision_required(context):
-        #     bpy.ops.object.subdivide_mesh()
-
-        # self.__init_patch_obj__(context)
-        # bpy.ops.ui.reloadtranslation()
-        # return {'FINISHED'}
-        
-        # DIFF: Richard had different code here
-
-        # Check if all submeshes are supported by algorithms.
-        # Subdivide the mesh if not.
         if Highlighter.is_subdivision_required(context):
             bpy.ops.object.subdivide_mesh()
 
@@ -59,7 +51,7 @@ class PolyhedralSplines(bpy.types.Operator):
         bpy.ops.ui.reloadtranslation()
 
         PolyhedralSplines.polyhedral_splines_finished = True
-        #bpy.context.scene.polyhedral_splines_finished = True
+        # bpy.context.scene.polyhedral_splines_finished = True
         return {'FINISHED'}
 
     def __init_patch_obj__(self, context):
@@ -72,7 +64,7 @@ class PolyhedralSplines(bpy.types.Operator):
         bm = bmesh.new()
         bm.from_mesh(control_mesh)
         bm.verts.ensure_lookup_table()
-        bm.faces.ensure_lookup_table() 
+        bm.faces.ensure_lookup_table()
 
         patchWrappers = PatchHelper.getPatches(bm)
         for patchWrapper in patchWrappers:
@@ -84,7 +76,7 @@ class PolyhedralSplines(bpy.types.Operator):
                 bpy.context.scene.objects[patch_name].parent = obj
                 # save the corner coordinates of the patch
                 # bpy.context.scene.objects[patch_name].corner_coords = patchWrapper.patch.corner_coords
-                PolyhedralSplines.verts.update({patch_name : patchWrapper.patch.corner_coords})
+                PolyhedralSplines.patch_to_corners.update({patch_name : (patchWrapper.patch.struct_name, patchWrapper.patch.corner_coords)})
 
             print("Generate patch obj time usage (sec): ", time.process_time() - start)
 
@@ -97,58 +89,50 @@ class PolyhedralSplines(bpy.types.Operator):
         else:
             bm.to_mesh(control_mesh)
             control_mesh.update()
-        
-        bpy.app.handlers.depsgraph_update_post.append(edit_object_change_handler)
-        # print(len(PatchTracker.patch_names))
-        '''
-        if input("Coverage Test? (y/n): ") != 'n':
-            PolyhedralSplines.coverage_test()
-        '''
 
-# def coverage_test(): 
-#     i = 0
-#     for key, val in verts.items():
-#         i += 1
-#         if i % 50 == 0:
-#             print(f"Patch {i}")
-#         if val != []:
-#             for corner in val:
-#                 coords = tuple(corner)
-#                 create_control_cube(coords, bpy.context.scene.objects[key])
+        bpy.app.handlers.depsgraph_update_post.append(edit_object_change_handler)
+
 
     @staticmethod
-    def coverage_test():
-        tups = []
-
+    def get_verts():
         if input("full test? (y/n): ") != 'n':
-            for key, val in PolyhedralSplines.verts.items():
-                if val != []:
-                    for corner in val:
-                        coords = tuple(corner)
-                        tups.append((coords, key))
-            new_tups = []
-            for tup in tups:
-                if tup[0] not in [t[0] for t in new_tups]:
-                    new_tups.append((tup[0], tup[1]))
-            print(f"Number of total patches: {len(tups)}")
-            print(f"Number of unique patches: {len(new_tups)}")
-            i = 0
-            for tup in new_tups:
-                i += 1
-                if i % 50 == 0:
-                    print(f"Patch {i}/{len(new_tups)}")
-                PolyhedralSplines.create_control_cube(tup[0], bpy.context.scene.objects[tup[1]])
-        else:
-            for key, item in PolyhedralSplines.verts.items():
-                if item != []:
-                    print(key, end=', ')
-            patch_index = 'y'
-            while patch_index != 'n':
-                patch_index = input("Enter patch index: ")
-                patch_name = "SurfPatch." + str(patch_index)
-                for corner in PolyhedralSplines.verts[patch_name]:
-                    coords = tuple(corner)
-                    PolyhedralSplines.create_control_cube(coords, bpy.context.scene.objects[patch_name])
+            for key, val in PolyhedralSplines.patch_to_corners.items():
+                # corner[1] is the corner coordinates because
+                # corner[0] is the type of contructed patch
+                coords = tuple(val[1])
+                tups.append((coords, key))
+            no_dupes_tups = []
+            seen_coords = set()
+            for coords, key in tups:
+
+                # -----------------------------------
+                # this block of code converts the coordinates into a tuple
+                # from a numpy array so it can be hashed and checked for duplicates
+                check_coords = []
+                for cord in coords:
+                    check_coords.extend(list(cord))
+                check_coords = tuple(check_coords)
+                # -----------------------------------
+
+                if check_coords not in seen_coords:
+                    no_dupes_tups.append((coords, key))
+                    seen_coords.add(check_coords)
+
+            # -----------------------------------
+            # just to find the amount of control points
+            total_control_points = 0
+            unique_control_points = 0
+            for corners, constructor in tups:
+                for corner in corners:
+                    total_control_points += 1
+            for corners, constructor in no_dupes_tups:
+                for corner in corners:
+                    unique_control_points += 1
+            print(f"Number of total control points: {total_control_points}")
+            print(f"Number of unique control points: {unique_control_points}")
+        PolyhedralSplines.coverage_test_var = True
+        return no_dupes_tups
+
 
     @staticmethod
     def control_cube_test(patch_index_str):
@@ -171,7 +155,8 @@ class PolyhedralSplines(bpy.types.Operator):
 
     @staticmethod
     def create_control_cube(location, parent_obj=None):
-        bpy.ops.mesh.primitive_cube_add(size=0.01, enter_editmode=False, align='WORLD', location=location, scale=(1, 1, 1))
+        bpy.ops.mesh.primitive_cube_add(size=0.01, enter_editmode=False, align='WORLD', location=location,
+                                        scale=(1, 1, 1))
         cube = bpy.context.active_object
         if parent_obj is not None:
             name = "ControlCube." + str(parent_obj.name)
@@ -180,6 +165,14 @@ class PolyhedralSplines(bpy.types.Operator):
         else:
             name = "ControlCube."
             cube.name = name
+        #cube["vertex_indices"] = vertex_indices
+
+        PolyhedralSplines.wireframe_vertices.append(location)  # new
+
+        # new test - can probably remove these 2 lines
+        cube["original_location"] = location
+        cube["movement_vector"] = (0, 0, 0)
+
 
 # if previous mode is not edit, switching to edit has no need to update surface
 class Mode:
@@ -190,9 +183,11 @@ class Mode:
 # please see https://developer.blender.org/T73638
 prev_mode = 'OBJECT'
 
+
 @persistent
 def edit_object_change_handler(scene, context):
     obj = bpy.context.active_object
+    # print(obj.type)
 
     if scene.previous_object:
         prev_obj = scene.previous_object
@@ -210,28 +205,31 @@ def edit_object_change_handler(scene, context):
             # print("PolyhedralSplines has finished, and a surface is selected")
             if prev_obj != obj:
                 print("PolyhedralSplines has finished, and a new surface is selected")
-                #print("new")
-                #while input("Do you want to add control cubes to a patch? (y/n): ") != 'n':
-                    # print(obj.name)
-                    # Split the string by '.' and take the second part
+                # print("new")
+                # while input("Do you want to add control cubes to a patch? (y/n): ") != 'n':
+                # print(obj.name)
+                # Split the string by '.' and take the second part
                 patch_index_str = obj.name.split('.')[1]
                 PolyhedralSplines.control_cube_test(patch_index_str)
-
 
     if obj.mode == 'EDIT' and Mode.prev == 'EDIT' and obj.type == 'MESH':
         update_surface(context, obj)
 
-
-    '''
-    if obj.type == 'SURFACE':
-        print("You selected a surface")
-    if obj.type == 'MESH':
-        print("You selected a mesh")
-    print(obj.type, "inbetween")
-    print("in function")
-    '''
-
     Mode.prev = obj.mode
+
+    # new test
+    if obj.type == 'MESH' and PolyhedralSplines.coverage_test_var and "ControlCube" in obj.name:
+        original_location = obj.get("original_location", None)
+        if original_location:
+            current_location = obj.location
+            movement_vector = (
+                current_location.x - original_location[0],
+                current_location.y - original_location[1],
+                current_location.z - original_location[2],
+            )
+            # print("Original Location:", original_location[0], original_location[1], original_location[2])
+            obj["movement_vector"] = movement_vector
+            print(f"{obj.name} moved: {movement_vector}")
 
     return None
 
@@ -284,4 +282,5 @@ def update_surface(context, obj):
 
 bpy.app.handlers.depsgraph_update_post.append(edit_object_change_handler)
 bpy.types.Scene.polyhedral_splines_finished = bpy.props.BoolProperty(default=False)
+bpy.types.Scene.coverage_test_var = bpy.props.BoolProperty(default=False)
 bpy.types.Scene.previous_object = bpy.props.PointerProperty(type=bpy.types.Object)
