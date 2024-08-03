@@ -24,6 +24,8 @@ class PolyhedralSplines(bpy.types.Operator):
     bl_description = "Generates polyhedral spline mesh. Some mesh configurations are not supported, subdivide the mesh beforehand if this is the case"
     polyhedral_splines_finished = False
     patch_to_corners = {}
+    verts = []
+    full_verts = []
 
     def __init__(self):
         print("Start")
@@ -100,45 +102,47 @@ class PolyhedralSplines(bpy.types.Operator):
             bm.to_mesh(control_mesh)
             control_mesh.update()
         
+        PolyhedralSplines.full_verts, PolyhedralSplines.verts = PolyhedralSplines.get_verts()
         bpy.app.handlers.depsgraph_update_post.append(edit_object_change_handler)
                 
     def get_verts(): 
-        if input("full test? (y/n): ") != 'n':
-            for key, val in PolyhedralSplines.patch_to_corners.items():
-                # corner[1] is the corner coordinates because
-                # corner[0] is the type of contructed patch
-                coords = tuple(val[1])
-                tups.append((coords, key))
-            no_dupes_tups = []
-            seen_coords = set()
-            for coords, key in tups:
+        # if input("full test? (y/n): ") != 'n':
+        for parent, val in PolyhedralSplines.patch_to_corners.items():
+            # corner[1] is the corner coordinates because
+            # corner[0] is the type of contructed patch
+            coords = tuple(val[1])
+            patch_type = val[0]
+            tups.append((coords, patch_type, parent))
+        no_dupes_tups = []
+        seen_coords = set()
+        for coords, patch_type, parent in tups:
 
-                # -----------------------------------
-                # this block of code converts the coordinates into a tuple
-                # from a numpy array so it can be hashed and checked for duplicates
-                check_coords = []
-                for cord in coords:
-                    check_coords.extend(list(cord))
-                check_coords = tuple(check_coords)
-                # -----------------------------------
-
-                if check_coords not in seen_coords:
-                    no_dupes_tups.append((coords, key))
-                    seen_coords.add(check_coords)
-                
             # -----------------------------------
-            # just to find the amount of control points
-            total_control_points = 0
-            unique_control_points = 0
-            for corners, constructor in tups:
-                for corner in corners:
-                    total_control_points += 1
-            for corners, constructor in no_dupes_tups:
-                for corner in corners:
-                    unique_control_points += 1
-            print(f"Number of total control points: {total_control_points}")
-            print(f"Number of unique control points: {unique_control_points}")
-        return no_dupes_tups
+            # this block of code converts the coordinates into a tuple
+            # from a numpy array so it can be hashed and checked for duplicates
+            check_coords = []
+            for cord in coords:
+                check_coords.extend(list(cord))
+            check_coords = tuple(check_coords)
+            # -----------------------------------
+
+            if check_coords not in seen_coords:
+                no_dupes_tups.append((coords, patch_type, parent))
+                seen_coords.add(check_coords)
+            
+        # -----------------------------------
+        # just to find the amount of control points
+        total_control_points = 0
+        unique_control_points = 0
+        for corners, constructor, parent in tups:
+            for corner in corners:
+                total_control_points += 1
+        for corners, constructor, parent in no_dupes_tups:
+            for corner in corners:
+                unique_control_points += 1
+        print(f"Number of total control points: {total_control_points}")
+        print(f"Number of unique control points: {unique_control_points}")
+        return tups, no_dupes_tups
             # -----------------------------------
         #     i = 0
         #     for tup in no_dupes_tups:
@@ -212,24 +216,8 @@ def edit_object_change_handler(scene, context):
     if obj is None:
         return None
 
-    # if bpy.context.scene.polyhedral_splines_finished:
-    #     if obj.type == 'SURFACE':
-    #         # print("PolyhedralSplines has finished, and a surface is selected")
-    #         if prev_obj != obj:
-    #             print("PolyhedralSplines has finished, and a new surface is selected")
-    #             spline = obj.data.splines[0]
-    #             control_points = [pt.co for pt in spline.points]
 
-    #             approx_center = numpy.mean(control_points, axis=0)[:3]
-    #             #print("new")
-    #             #while input("Do you want to add control cubes to a patch? (y/n): ") != 'n':
-    #                 # print(obj.name)
-    #                 # Split the string by '.' and take the second part
-    #             patch_index_str = obj.name.split('.')[1]
-    #             control_cube_test(patch_index_str, approx_center)
-
-
-    if obj.mode == 'EDIT' and Mode.prev == 'EDIT' and obj.type == 'MESH':
+    if obj.mode == 'EDIT' and Mode.prev == 'EDIT' and obj.type == 'MESH' and obj.name != "SurfaceMesh":
         update_surface(context, obj)
 
 
