@@ -3,14 +3,15 @@ import bmesh
 from bpy.app.handlers import persistent
 from .polyhedral_splines import PolyhedralSplines
 
+import numpy as np
 
 class SurfaceMesh(bpy.types.Operator):
     """fake net operator"""
     bl_label = "Surface Mesh"
     bl_idname = "object.create_surface_mesh"
     bl_description = "Creates a surface mesh"
+    control_mesh_name = None
     control_mesh_obj = None
-    control_mesh = None
     patch_to_corners = None
     verts = None
     full_verts = None
@@ -26,7 +27,6 @@ class SurfaceMesh(bpy.types.Operator):
 
         if obj in selected and obj.mode == "OBJECT" and obj.type == "MESH" and PolyhedralSplines.polyhedral_splines_finished:
             SurfaceMesh.control_mesh_obj = obj
-            SurfaceMesh.control_mesh = obj.data
             SurfaceMesh.patch_to_corners = PolyhedralSplines.patch_to_corners
             SurfaceMesh.verts = PolyhedralSplines.verts
             SurfaceMesh.full_verts = PolyhedralSplines.full_verts
@@ -41,33 +41,48 @@ class SurfaceMesh(bpy.types.Operator):
 
     # Harry addition to test modifying mesh
     def mesh_modification(original_location, delta_location):
+        control_mesh = bpy.data.objects[SurfaceMesh.control_mesh_name]
+
+        bpy.ops.object.mode_set(mode='OBJECT')
+
         bm = bmesh.new()
-        bm.from_mesh(SurfaceMesh.control_mesh)
+        bm.from_mesh(control_mesh.data)
         bm.verts.ensure_lookup_table()
-        bm.faces.ensure_lookup_table()
 
-
+        # undo the rotation from the original location
+        original_location[1], original_location[2] = original_location[2], -original_location[1]
 
         closest_vert_indices = []
-        min_distance = float('inf')
-        while len(closest_vert_indices) < 4:
-            for i, vert in enumerate(bm.verts):
-                dist = SurfaceMesh.distance(vert.co, original_location)
-                if dist < min_distance and i not in closest_vert_indices:
-                    min_distance = dist
-                    closest_vert_index = i
-            closest_vert_indices.append(closest_vert_index)
+        for _ in range(4):
             min_distance = float('inf')
+            closest_vert_indicex = None
+            for i, vert in enumerate(bm.verts):
+                if i not in closest_vert_indices:
+                    dist = (vert.co - original_location).length
+                    if dist < min_distance:
+                        min_distance = dist
+                        closest_vert_indicex = i
+            if closest_vert_indicex is not None:
+                closest_vert_indices.append(closest_vert_indicex)
+        
+        print("Before the locations are changed")
+        for i in sorted(closest_vert_indices):
+            print(bm.verts[i].co)
+
         for i in closest_vert_indices:
             bm.verts[i].co += delta_location
-        # to mesh isn't working because
-        # SurfaceMesh.control_mesh is in edit mode
-        bpy.context.view_layer.objects.active = SurfaceMesh.control_mesh_obj
-        bpy.ops.object.mode_set(mode='OBJECT')
-        bm.to_mesh(SurfaceMesh.control_mesh)
-        SurfaceMesh.control_mesh.update()
+
+        print("After the locations are changed")
+        for i in sorted(closest_vert_indices):
+            print(bm.verts[i].co)
+
+        bm.to_mesh(control_mesh.data)
+        bm.free()
+
+        control_mesh.data.update()
+
         bpy.ops.object.mode_set(mode='EDIT')
-        # -----------------------------------
+
 
     def execute(self, context):
         # Perform some action
@@ -84,7 +99,6 @@ class SurfaceMesh(bpy.types.Operator):
 
     @staticmethod
     def create_wireframe_mesh(context):
-        import numpy as np
         mesh = bpy.data.meshes.new(name="WireframeMesh")
 
         # Dictionary to store unique vertices
@@ -135,7 +149,8 @@ class SurfaceMesh(bpy.types.Operator):
         # Link object to the current collection
         bpy.context.collection.objects.link(obj)
 
-        SurfaceMesh.control_mesh_obj.hide_viewport = True
+        SurfaceMesh.control_mesh_name = SurfaceMesh.control_mesh_obj.name
+        # SurfaceMesh.control_mesh_obj.hide_viewport = True
 
         # Set the object as active and select it
         bpy.context.view_layer.objects.active = obj
@@ -201,11 +216,10 @@ def edit_object_change_handler(scene, context):
                     ps.delta_total += ps.delta_location
             elif delta_sum == 0 and ps.delta_total is not None:
                 print("delta total:", ps.delta_total)
-                SurfaceMesh.mesh_modification(ps.previous_location, delta_location=ps.delta_total)
-                bpy.context.active_object = surface_mesh_obj
+                dt = ps.delta_total
+                pl = ps.previous_location
                 ps.delta_total = None
-                ps.previous_location = None
-                ps.previous_vertex_idx = None 
-                import sys; sys.exit(0)
+                SurfaceMesh.mesh_modification(pl, delta_location=dt)
+                # bpy.context.active_object = bpy.data.objects["SurfaceMesh"]
 
 bpy.app.handlers.depsgraph_update_post.append(edit_object_change_handler)
