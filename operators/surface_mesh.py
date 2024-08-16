@@ -131,6 +131,8 @@ class SurfaceMesh(bpy.types.Operator):
             if face_type == "Regular":
                 # Rotate vertex: [x, y, z] -> [x, -z, y]
                 for vert in face:
+                    # rotated_vertex = np.array([vert[0], -vert[2], vert[1]])
+                    # rotated_vertex = np.array([rotated_vertex[0], rotated_vertex[2], -rotated_vertex[1]])
                     rotated_vertex = np.array([vert[0], -vert[2], vert[1]])
                     # Add vertex and get its index
                     vert_index = add_vertex(rotated_vertex)
@@ -154,21 +156,23 @@ class SurfaceMesh(bpy.types.Operator):
         # Update mesh
         mesh.update()
 
-        # Create a new object with the mesh data
-        obj = bpy.data.objects.new(name="SurfaceMesh", object_data=mesh)
-
         bm = bmesh.new()
         bm.from_mesh(mesh)
         bm.verts.ensure_lookup_table()
         bm.faces.ensure_lookup_table()
 
-        control_points_layer = bm.verts.layers.float_vector.new("control_points")
+        # using float_color to store control points because it can store 4 values
+        control_points_layer = bm.verts.layers.float_color.new("control_points")
         
         for vert in bm.verts:
-            vert[control_points_layer] = (0, 0, 0)
+            vert[control_points_layer] = (12, 313, 21, 29)
 
         mesh = bpy.context.active_object.data
         bm.to_mesh(mesh)
+
+        # Create a new object with the mesh data
+        obj = bpy.data.objects.new(name="SurfaceMesh", object_data=mesh)
+
         bm.free()
 
         # Link object to the current collection
@@ -232,9 +236,13 @@ def edit_object_change_handler(scene, context):
             bm = bmesh.from_edit_mesh(obj.data)
             bm.verts.ensure_lookup_table()
             bm.faces.ensure_lookup_table()
+
+            control_points_layer = bm.verts.layers.float_color.get("control_points")
+
             for v in bm.verts:
                 if v.select:
-                    print(v[control_points_layer])
+                    control_points = v[control_points_layer]
+                    print(control_points)
                     # if ps.previous_location is None:
                     #     ps.previous_location = v.co.copy()
                     #     ps.previous_vertex_idx = v.index
