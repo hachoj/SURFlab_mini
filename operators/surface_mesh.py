@@ -4,6 +4,7 @@ from bpy.app.handlers import persistent
 from .polyhedral_splines import PolyhedralSplines
 
 import numpy as np
+from mathutils import Vector
 
 class PersistentState():
     previous_mesh = None
@@ -12,9 +13,7 @@ class PersistentState():
     previous_location = None
     delta_location = (0, 0, 0)
     # delta_total = None
-
-ps = PersistentState()
-
+# persitent_data = {}
 
 class SurfaceMesh(bpy.types.Operator):
     """fake net operator"""
@@ -51,7 +50,7 @@ class SurfaceMesh(bpy.types.Operator):
         return new_location - original_location
 
     # Harry addition to test modifying mesh
-    def mesh_modification(original_location, delta_location):
+    def mesh_modification(vertex_index, delta_location):
         control_mesh = bpy.data.objects[SurfaceMesh.control_mesh_name]
 
         bpy.ops.object.mode_set(mode='OBJECT')
@@ -61,31 +60,15 @@ class SurfaceMesh(bpy.types.Operator):
         bm.verts.ensure_lookup_table()
 
         # undo the rotation from the original location
-        original_location[1], original_location[2] = original_location[2], -original_location[1]
+        # original_location[1], original_location[2] = original_location[2], -original_location[1]
 
-        closest_vert_indices = []
-        for _ in range(4):
-            min_distance = float('inf')
-            closest_vert_indicex = None
-            for i, vert in enumerate(bm.verts):
-                if i not in closest_vert_indices:
-                    dist = (vert.co - original_location).length
-                    if dist < min_distance:
-                        min_distance = dist
-                        closest_vert_indicex = i
-            if closest_vert_indicex is not None:
-                closest_vert_indices.append(closest_vert_indicex)
-        
         print("Before the locations are changed")
-        for i in sorted(closest_vert_indices):
-            print(bm.verts[i].co)
+        print(bm.verts[vertex_index].co)
 
-        for i in closest_vert_indices:
-            bm.verts[i].co += delta_location
+        bm.verts[vertex_index].co += delta_location
 
         print("After the locations are changed")
-        for i in sorted(closest_vert_indices):
-            print(bm.verts[i].co)
+        print("---------------------------------------------")
 
         bm.to_mesh(control_mesh.data)
         bm.free()
@@ -131,10 +114,10 @@ class SurfaceMesh(bpy.types.Operator):
             if face_type == "Regular":
                 # Rotate vertex: [x, y, z] -> [x, -z, y]
                 for vert in face:
-                    # rotated_vertex = np.array([vert[0], -vert[2], vert[1]])
-                    # rotated_vertex = np.array([rotated_vertex[0], rotated_vertex[2], -rotated_vertex[1]])
                     rotated_vertex = np.array([vert[0], -vert[2], vert[1]])
+                    # rotated_vertex = np.array([rotated_vertex[0], rotated_vertex[2], -rotated_vertex[1]])
                     # Add vertex and get its index
+                    # rotated_vertex = np.array([vert[0], -vert[1], -vert[2]])
                     vert_index = add_vertex(rotated_vertex)
                     face_verts.append(vert_index)
                 
@@ -156,30 +139,58 @@ class SurfaceMesh(bpy.types.Operator):
         # Update mesh
         mesh.update()
 
-        bm = bmesh.new()
-        bm.from_mesh(mesh)
-        bm.verts.ensure_lookup_table()
-        bm.faces.ensure_lookup_table()
+        sbm = bmesh.new()
+        sbm.from_mesh(mesh)
+        sbm.verts.ensure_lookup_table()
+        sbm.faces.ensure_lookup_table()
 
         # using float_color to store control points because it can store 4 values
-        control_points_layer = bm.verts.layers.float_color.new("control_points")
-        
-        for vert in bm.verts:
-            vert[control_points_layer] = (12, 313, 21, 29)
 
-        mesh = bpy.context.active_object.data
-        bm.to_mesh(mesh)
+        SurfaceMesh.control_mesh_name = SurfaceMesh.control_mesh_obj.name
+        # SurfaceMesh.control_mesh_obj.hide_viewport = True
+
+        control_mesh = bpy.data.objects[SurfaceMesh.control_mesh_name]
+
+        bpy.ops.object.mode_set(mode='OBJECT')
+
+        cbm = bmesh.new()
+        cbm.from_mesh(control_mesh.data)
+        cbm.verts.ensure_lookup_table()
+
+        # undo the rotation from the original location
+
+        control_points_layer = sbm.verts.layers.float_color.new("control_points")
+        
+        for svert in sbm.verts:   
+            closest_vert_indices = []
+            # sverttemp = Vector((svert.co[0], -svert.co[2], svert.co[1]))
+            sverttemp = Vector((svert.co[0], svert.co[1], svert.co[2]))
+            for _ in range(4):
+                min_distance = float('inf')
+                closest_vert_index = None
+                for i, cvert in enumerate(cbm.verts):
+                    if i not in closest_vert_indices:
+                        dist = (cvert.co - sverttemp).length
+                        if dist < min_distance:
+                            min_distance = dist
+                            closest_vert_index = i
+                if closest_vert_index is not None:
+                    closest_vert_indices.append(closest_vert_index)
+            svert[control_points_layer] = [closest_vert_index for closest_vert_index in closest_vert_indices]
+
+
+        cmesh = bpy.context.active_object.data
+        cbm.to_mesh(cmesh)
+        cbm.free()
 
         # Create a new object with the mesh data
+        sbm.to_mesh(mesh)
+        sbm.free()
         obj = bpy.data.objects.new(name="SurfaceMesh", object_data=mesh)
-
-        bm.free()
 
         # Link object to the current collection
         bpy.context.collection.objects.link(obj)
 
-        SurfaceMesh.control_mesh_name = SurfaceMesh.control_mesh_obj.name
-        # SurfaceMesh.control_mesh_obj.hide_viewport = True
 
         # Set the object as active and select it
         bpy.context.view_layer.objects.active = obj
@@ -189,34 +200,19 @@ class SurfaceMesh(bpy.types.Operator):
         SurfaceMesh.wireframe_mesh_created = True
         # Optionally, clear the list after creating the mesh
         # PolyhedralSplines.wireframe_vertices.clear()
+        # SurfaceMesh.mesh_modification(300, Vector((2, 2, 2)))
 
-
-# def surface_mesh_update_handler(scene):
-#     if ps.previous_mesh is not None:
-#         old_surface_mesh = ps.previous_mesh.data
-#         obj = bpy.context.active_object
-#         if obj and obj.type == 'MESH' and obj.name == "SurfaceMesh" and obj.mode == 'EDIT':
-#             print("Surface mesh is being edited")
-#             # this isn't being reached
-#             current_surface_mesh = bpy.context.active_object
-#             bm = bmesh.from_edit_mesh(current_surface_mesh.data)
-#             bm.verts.ensure_lookup_table()
-#             changed_vertices = []
-#             for v in bm.verts:
-#                 if v.co != old_surface_mesh.vertices[v.index].co:
-#                     print("Vertex changed")
-#                     changed_vertices.append((v.index, SurfaceMesh.delta_location(original_location=old_mesh.vertices[v.index].co, new_location=v.co)))
-#             if changed_vertices:
-#                 ps.previous_mesh = current_surface_mesh
-#             for changed_vertex in changed_vertices:
-#                 changed_vertex_index, delta_location = changed_vertex
-#                 SurfaceMesh.mesh_modification(original_location=old_mesh.vertices[changed_vertex_index].co, delta_location=delta_location)
-            
-# bpy.app.handlers.depsgraph_update_post.append(surface_mesh_update_handler)
+# bpy.types.WindowManager.previous_vertex_idx = bpy.props.IntProperty(name="Previous Vertex Index", default=-1)
+persistent_data = {"prev_idx":-1, "prev_loc": None, "delta_loc": Vector((0, 0, 0,)), "delta_sum": Vector((0, 0, 0)), "suppress_handler": False}
 
 @persistent
 def edit_object_change_handler(scene, context):
+    if persistent_data["suppress_handler"]:
+        return
     obj = bpy.context.active_object
+    # wm = bpy.context.window_manager
+    # if not hasattr(wm, "previous_vertex_idx"):
+    #     wm.previous_vertex_idx = None
 
     if scene.previous_object:
         prev_obj = scene.previous_object
@@ -237,12 +233,47 @@ def edit_object_change_handler(scene, context):
             bm.verts.ensure_lookup_table()
             bm.faces.ensure_lookup_table()
 
-            control_points_layer = bm.verts.layers.float_color.get("control_points")
+            control_points_layer = bm.verts.layers.float_color["control_points"]
 
             for v in bm.verts:
                 if v.select:
-                    control_points = v[control_points_layer]
-                    print(control_points)
+                    # if persistent_data["prev_idx"] != -1 and persistent_data["prev_idx"] == v.index: 
+                    #     control_points = v[control_points_layer]
+                    #     print("control points:", control_points)
+                    #     for control_point_index in control_points:
+                    #         print("did loop????")
+                    #         print("control point:", int(control_point_index))
+                    #         SurfaceMesh.mesh_modification(int(control_point_index), Vector((2, 2, 2)))
+                    # print("did it get here?")
+                    # persistent_data["prev_idx"] = v.index 
+                    # wm.previous_vertex_idx = v.index
+                    if persistent_data["prev_loc"] is None:
+                        persistent_data["prev_loc"] = v.co.copy()
+                        persistent_data["prev_idx"] = v.index
+                    elif persistent_data["prev_idx"] != v.index:
+                        persistent_data["prev_loc"] = v.co.copy()
+                        persistent_data["delta_loc"] = Vector((0, 0, 0))
+                        persistent_data["prev_idx"] = v.index
+                    elif persistent_data["prev_idx"] == v.index:
+                        persistent_data["delta_loc"] = SurfaceMesh.delta_location(original_location=persistent_data["prev_loc"], new_location=v.co)
+                        persistent_data["prev_loc"] = v.co.copy()
+                        persistent_data["prev_idx"] = v.index
+                    break
+            delta_sum = sum(abs(coord) for coord in persistent_data["delta_loc"])
+            if delta_sum != 0:
+                persistent_data["delta_sum"] += persistent_data["delta_loc"]
+            elif delta_sum == 0 and persistent_data["delta_sum"] != Vector((0, 0, 0)):
+                control_points = v[control_points_layer]
+                print(f"delta sum (total change being applied): {persistent_data['delta_sum']}")
+                for control_point_index in control_points:
+                    print(f"control point getting modified: {int(control_point_index)}")
+                    persistent_data["suppress_handler"] = True
+                    SurfaceMesh.mesh_modification(int(control_point_index), persistent_data["delta_sum"])
+                    persistent_data["suppress_handler"] = False
+                persistent_data["delta_loc"] = Vector((0, 0, 0))
+                persistent_data["delta_sum"] = Vector((0, 0, 0))
+
+
                     # if ps.previous_location is None:
                     #     ps.previous_location = v.co.copy()
                     #     ps.previous_vertex_idx = v.index
@@ -254,7 +285,6 @@ def edit_object_change_handler(scene, context):
                     #     ps.delta_location = SurfaceMesh.delta_location(original_location=ps.previous_location, new_location=v.co)
                     #     ps.previous_location = v.co.copy()
                     #     ps.previous_vertex_idx = v.index
-                    break
             # delta_sum = 0
             # for coord in ps.delta_location:
             #     delta_sum += abs(coord)
