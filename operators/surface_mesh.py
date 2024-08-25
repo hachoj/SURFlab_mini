@@ -115,6 +115,7 @@ class SurfaceMesh(bpy.types.Operator):
                 # Rotate vertex: [x, y, z] -> [x, -z, y]
                 for vert in face:
                     rotated_vertex = np.array([vert[0], -vert[2], vert[1]])
+                    # rotated_vertex = np.array([vert[0], vert[1], vert[2]])
                     # rotated_vertex = np.array([rotated_vertex[0], rotated_vertex[2], -rotated_vertex[1]])
                     # Add vertex and get its index
                     # rotated_vertex = np.array([vert[0], -vert[1], -vert[2]])
@@ -163,8 +164,9 @@ class SurfaceMesh(bpy.types.Operator):
         
         for svert in sbm.verts:   
             closest_vert_indices = []
-            # sverttemp = Vector((svert.co[0], -svert.co[2], svert.co[1]))
-            sverttemp = Vector((svert.co[0], svert.co[1], svert.co[2]))
+            # undo rotation from the original location
+            sverttemp = Vector((svert.co[0], svert.co[2], -svert.co[1]))
+            # sverttemp = Vector((svert.co[0], svert.co[1], svert.co[2]))
             for _ in range(4):
                 min_distance = float('inf')
                 closest_vert_index = None
@@ -237,16 +239,6 @@ def edit_object_change_handler(scene, context):
 
             for v in bm.verts:
                 if v.select:
-                    # if persistent_data["prev_idx"] != -1 and persistent_data["prev_idx"] == v.index: 
-                    #     control_points = v[control_points_layer]
-                    #     print("control points:", control_points)
-                    #     for control_point_index in control_points:
-                    #         print("did loop????")
-                    #         print("control point:", int(control_point_index))
-                    #         SurfaceMesh.mesh_modification(int(control_point_index), Vector((2, 2, 2)))
-                    # print("did it get here?")
-                    # persistent_data["prev_idx"] = v.index 
-                    # wm.previous_vertex_idx = v.index
                     if persistent_data["prev_loc"] is None:
                         persistent_data["prev_loc"] = v.co.copy()
                         persistent_data["prev_idx"] = v.index
@@ -272,34 +264,5 @@ def edit_object_change_handler(scene, context):
                     persistent_data["suppress_handler"] = False
                 persistent_data["delta_loc"] = Vector((0, 0, 0))
                 persistent_data["delta_sum"] = Vector((0, 0, 0))
-
-
-                    # if ps.previous_location is None:
-                    #     ps.previous_location = v.co.copy()
-                    #     ps.previous_vertex_idx = v.index
-                    # elif ps.previous_vertex_idx != v.index:
-                    #     ps.previous_location = v.co.copy()
-                    #     ps.delta_location = (0, 0, 0)
-                    #     ps.previous_vertex_idx = v.index
-                    # elif ps.previous_vertex_idx == v.index:
-                    #     ps.delta_location = SurfaceMesh.delta_location(original_location=ps.previous_location, new_location=v.co)
-                    #     ps.previous_location = v.co.copy()
-                    #     ps.previous_vertex_idx = v.index
-            # delta_sum = 0
-            # for coord in ps.delta_location:
-            #     delta_sum += abs(coord)
-            # if delta_sum != 0:
-            #     SurfaceMesh.mesh_modification(ps.previous_location, ps.delta_location)
-            #     print("delta location:", ps.delta_location)
-            #     print("previous location:", ps.previous_location)
-            #     ps.previous_location = None
-            #     ps.delta_location = (0, 0, 0)
-            # # elif delta_sum == 0 and ps.delta_total is not None:
-            # #     print("delta total:", ps.delta_total)
-            # #     dt = ps.delta_total
-            # #     pl = ps.previous_location
-            # #     ps.delta_total = None
-            # #     SurfaceMesh.mesh_modification(pl, delta_location=dt)
-            # #     # bpy.context.active_object = bpy.data.objects["SurfaceMesh"]
 
 bpy.app.handlers.depsgraph_update_post.append(edit_object_change_handler)
