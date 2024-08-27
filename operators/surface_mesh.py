@@ -65,7 +65,10 @@ class SurfaceMesh(bpy.types.Operator):
         print("Before the locations are changed")
         print(bm.verts[vertex_index].co)
 
-        bm.verts[vertex_index].co += delta_location
+        if 0 <= vertex_index < len(bm.verts):
+            bm.verts[vertex_index].co += delta_location
+        else:
+            print(f"Invalid vertex_index: {vertex_index}")
 
         print("After the locations are changed")
         print("---------------------------------------------")
@@ -248,15 +251,26 @@ def edit_object_change_handler(scene, context):
                         persistent_data["prev_idx"] = v.index
                     elif persistent_data["prev_idx"] == v.index:
                         persistent_data["delta_loc"] = SurfaceMesh.delta_location(original_location=persistent_data["prev_loc"], new_location=v.co)
+                        persistent_data["delta_loc"] = Vector((persistent_data["delta_loc"][0], persistent_data["delta_loc"][2], -persistent_data["delta_loc"][1]))
                         persistent_data["prev_loc"] = v.co.copy()
                         persistent_data["prev_idx"] = v.index
                     break
-            delta_sum = sum(abs(coord) for coord in persistent_data["delta_loc"])
-            if delta_sum != 0:
+            # delta_mag = sum(abs(coord) for coord in persistent_data["delta_loc"])
+            # if delta_mag != 0:
+            #     for control_point_index in v[control_points_layer]:
+            #         print(f"control point being modified: {int(control_point_index)}")
+            #         persistent_data["suppress_handler"] = True
+            #         SurfaceMesh.mesh_modification(int(control_point_index), persistent_data["delta_loc"])
+            #         persistent_data["suppress_handler"] = False
+            #     persistent_data["delta_loc"] = Vector((0, 0, 0))
+            #     persistent_data["delta_sum"] = Vector((0, 0, 0))
+            delta_mag = sum(abs(coord) for coord in persistent_data["delta_loc"])
+            if delta_mag != 0:
                 persistent_data["delta_sum"] += persistent_data["delta_loc"]
-            elif delta_sum == 0 and persistent_data["delta_sum"] != Vector((0, 0, 0)):
-                control_points = v[control_points_layer]
-                print(f"delta sum (total change being applied): {persistent_data['delta_sum']}")
+            elif delta_mag == 0 and persistent_data["delta_sum"] != Vector((0, 0, 0)):
+                control_points = v[control_points_layer].copy()
+                # print(f"delta sum (total change being applied): {persistent_data['delta_sum']}")
+                print(f"Control points to be modified: {control_points}")
                 for control_point_index in control_points:
                     print(f"control point getting modified: {int(control_point_index)}")
                     persistent_data["suppress_handler"] = True
