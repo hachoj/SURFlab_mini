@@ -14,6 +14,9 @@ class PatchTracker:
     vpatch_LUT: dict = {}  # vert to vert-based patch look up table
     fpatch_LUT: dict = {}  # vert to face-based patch look up table
 
+    # harry addition
+    patch_to_corners: dict = {}  # patch name to corner verts
+
     @classmethod
     def register_patch(cls, central_obj, neighbor_vert, patch_name):
         cls.patch_names.add(patch_name)
