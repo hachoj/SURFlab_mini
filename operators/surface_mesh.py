@@ -6,15 +6,6 @@ from .polyhedral_splines import PolyhedralSplines
 import numpy as np
 from mathutils import Vector
 
-# Not currently used, left in case it becomes the better option
-class PersistentState():
-    previous_mesh = None
-    previous_mesh_verts = None
-    previous_vertex_idx = None
-    previous_location = None
-    delta_location = (0, 0, 0)
-    # delta_total = None
-# persitent_data = {}
 
 class SurfaceMesh(bpy.types.Operator):
     """fake net operator"""
@@ -68,6 +59,7 @@ class SurfaceMesh(bpy.types.Operator):
 
         if 0 <= vertex_index < len(bm.verts):
             bm.verts[vertex_index].co += delta_location
+            assert bm.verts[vertex_index].is_valid, "Control point is invalid!"
         else:
             print(f"Invalid vertex_index: {vertex_index}")
 
@@ -82,6 +74,57 @@ class SurfaceMesh(bpy.types.Operator):
 
         bpy.ops.object.mode_set(mode='EDIT')
 
+    # # Function to validate control point's validity
+    # def validate_control_point(vertex, vertex_index):
+    #     assert vertex is not None, f"Control point {vertex_index} is None!"
+    #     assert hasattr(vertex, "co"), f"Control point {vertex_index} has no valid coordinates!"
+    #     # Ensure the vertex is within expected bounds (you can expand this check if needed)
+    #     assert not vertex.is_select, f"Control point {vertex_index} is in an invalid state!"
+
+    # # Copy function for safe manipulation
+    # def safe_copy_verts(verts):
+    #     # Ensuring deep copy to avoid memory overlap issues
+    #     return np.copy(verts)
+
+    # # Modify the existing mesh_modification to include these validations and safe copying
+    # def mesh_modification(vertex_index, delta_location):
+    #     control_mesh = bpy.data.objects[SurfaceMesh.control_mesh_name]
+
+    #     bpy.ops.object.mode_set(mode='OBJECT')
+
+    #     bm = bmesh.new()
+    #     bm.from_mesh(control_mesh.data)
+    #     bm.verts.ensure_lookup_table()
+
+    #     # Validate control point before modification
+    #     self.validate_control_point(bm.verts[vertex_index], vertex_index)
+
+    #     print("Before the locations are changed")
+    #     print(bm.verts[vertex_index].co)
+
+    #     # Copy the vertices safely before making modifications
+    #     copied_verts = selfsafe_copy_verts(bm.verts)
+
+    #     if 0 <= vertex_index < len(copied_verts):
+    #         # Apply the delta to move the control point
+    #         copied_verts[vertex_index].co += delta_location
+    #     else:
+    #         print(f"Invalid vertex_index: {vertex_index}")
+
+    #     print("After the locations are changed")
+    #     print(copied_verts[vertex_index].co)
+    #     print("---------------------------------------------")
+
+    #     # After modification, reapply the changes to the original data
+    #     bm.to_mesh(control_mesh.data)
+    #     bm.free()
+
+    #     control_mesh.data.update()
+
+    #     bpy.ops.object.mode_set(mode='EDIT')
+
+    #     # Validate control point after modification
+    #     self.validate_control_point(copied_verts[vertex_index], vertex_index)
 
     def execute(self, context):
         # Perform some action
@@ -220,12 +263,11 @@ persistent_data = {
 
 @persistent
 def edit_object_change_handler(scene, context):
+
     if persistent_data["suppress_handler"]:
         return
+
     obj = bpy.context.active_object
-    # wm = bpy.context.window_manager
-    # if not hasattr(wm, "previous_vertex_idx"):
-    #     wm.previous_vertex_idx = None
 
     if scene.previous_object:
         prev_obj = scene.previous_object
@@ -240,6 +282,7 @@ def edit_object_change_handler(scene, context):
 
     if bpy.context.scene.polyhedral_splines_finished and SurfaceMesh.wireframe_mesh_created and obj.type == 'MESH' and obj.name == "SurfaceMesh":
         if obj.mode == 'EDIT':
+            persistent_data["suppress_handler"] = True
             surface_mesh_obj = bpy.context.active_object
             bm = bmesh.from_edit_mesh(obj.data)
             bm.verts.ensure_lookup_table()
@@ -275,14 +318,15 @@ def edit_object_change_handler(scene, context):
                 persistent_data["delta_sum"] += persistent_data["delta_loc"]
             elif delta_mag == 0 and persistent_data["delta_sum"] != Vector((0, 0, 0)):
                 control_points = v[control_points_layer].copy()
-                # print(f"delta sum (total change being applied): {persistent_data['delta_sum']}")
+                print(f"delta sum (total change being applied): {persistent_data['delta_sum']}")
                 print(f"Control points to be modified: {control_points}")
                 for control_point_index in control_points:
                     print(f"control point getting modified: {int(control_point_index)}")
-                    persistent_data["suppress_handler"] = True
+                    # persistent_data["suppress_handler"] = True
                     SurfaceMesh.mesh_modification(int(control_point_index), persistent_data["delta_sum"])
-                    persistent_data["suppress_handler"] = False
+                    # persistent_data["suppress_handler"] = False
                 persistent_data["delta_loc"] = Vector((0, 0, 0))
                 persistent_data["delta_sum"] = Vector((0, 0, 0))
+            persistent_data["suppress_handler"] = False
 
 bpy.app.handlers.depsgraph_update_post.append(edit_object_change_handler)
