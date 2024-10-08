@@ -58,7 +58,9 @@ class SurfaceMesh(bpy.types.Operator):
         print(bm.verts[vertex_index].co)
 
         if 0 <= vertex_index < len(bm.verts):
+            bpy.context.view_layer.depsgraph.update()  # Disable updates
             bm.verts[vertex_index].co += delta_location
+            bpy.context.view_layer.update()  # Re-enable updates
             assert bm.verts[vertex_index].is_valid, "Control point is invalid!"
         else:
             print(f"Invalid vertex_index: {vertex_index}")
@@ -74,57 +76,6 @@ class SurfaceMesh(bpy.types.Operator):
 
         bpy.ops.object.mode_set(mode='EDIT')
 
-    # # Function to validate control point's validity
-    # def validate_control_point(vertex, vertex_index):
-    #     assert vertex is not None, f"Control point {vertex_index} is None!"
-    #     assert hasattr(vertex, "co"), f"Control point {vertex_index} has no valid coordinates!"
-    #     # Ensure the vertex is within expected bounds (you can expand this check if needed)
-    #     assert not vertex.is_select, f"Control point {vertex_index} is in an invalid state!"
-
-    # # Copy function for safe manipulation
-    # def safe_copy_verts(verts):
-    #     # Ensuring deep copy to avoid memory overlap issues
-    #     return np.copy(verts)
-
-    # # Modify the existing mesh_modification to include these validations and safe copying
-    # def mesh_modification(vertex_index, delta_location):
-    #     control_mesh = bpy.data.objects[SurfaceMesh.control_mesh_name]
-
-    #     bpy.ops.object.mode_set(mode='OBJECT')
-
-    #     bm = bmesh.new()
-    #     bm.from_mesh(control_mesh.data)
-    #     bm.verts.ensure_lookup_table()
-
-    #     # Validate control point before modification
-    #     self.validate_control_point(bm.verts[vertex_index], vertex_index)
-
-    #     print("Before the locations are changed")
-    #     print(bm.verts[vertex_index].co)
-
-    #     # Copy the vertices safely before making modifications
-    #     copied_verts = selfsafe_copy_verts(bm.verts)
-
-    #     if 0 <= vertex_index < len(copied_verts):
-    #         # Apply the delta to move the control point
-    #         copied_verts[vertex_index].co += delta_location
-    #     else:
-    #         print(f"Invalid vertex_index: {vertex_index}")
-
-    #     print("After the locations are changed")
-    #     print(copied_verts[vertex_index].co)
-    #     print("---------------------------------------------")
-
-    #     # After modification, reapply the changes to the original data
-    #     bm.to_mesh(control_mesh.data)
-    #     bm.free()
-
-    #     control_mesh.data.update()
-
-    #     bpy.ops.object.mode_set(mode='EDIT')
-
-    #     # Validate control point after modification
-    #     self.validate_control_point(copied_verts[vertex_index], vertex_index)
 
     def execute(self, context):
         # Perform some action
