@@ -4,280 +4,304 @@ from bpy.app.handlers import persistent
 from .polyhedral_splines import PolyhedralSplines
 
 import numpy as np
-from mathutils import Vector
-
+import math
+from mathutils import Vector, Matrix
 
 class SurfaceMesh(bpy.types.Operator):
-    """fake net operator"""
+    """Operator to create a surface mesh from the control mesh"""
     bl_label = "Surface Mesh"
     bl_idname = "object.create_surface_mesh"
     bl_description = "Creates a surface mesh"
-    control_mesh_name = None
-    control_mesh_obj = None
-    patch_to_corners = None
-    verts = None
-    full_verts = None
-    wireframe_mesh_created = False
 
+    # Class variables
+    control_mesh_name = None           # Name of the control mesh object
+    control_mesh_obj = None            # Reference to the control mesh object
+    patch_to_corners = None            # Mapping from patches to corner points
+    verts = None                       # List of vertices
+    full_verts = None                  # Complete list of vertices with additional information
+    wireframe_mesh_created = False     # Flag indicating if the wireframe mesh has been created
 
-    # poll function makes it so that you cannot select button function unless certain requirements are met
-    # such as having an object selected
     @classmethod
     def poll(cls, context):
+        """Determine if the you can make a surface mesh with given conditions"""
         obj = context.active_object
-        selected = context.selected_objects
+        return (
+            obj is not None and
+            obj.type == 'MESH' and
+            obj.mode == 'EDIT' and
+            obj.name == "SurfaceMesh" and
+            PolyhedralSplines.polyhedral_splines_finished
+            or
+            obj in context.selected_objects and
+            obj.mode == "OBJECT" and
+            obj.type == "MESH" and
+            PolyhedralSplines.polyhedral_splines_finished
+        )
 
-        if obj in selected and obj.mode == "OBJECT" and obj.type == "MESH" and PolyhedralSplines.polyhedral_splines_finished:
+    def execute(self, context):
+        """Execute the operator to create the surface mesh"""
+        obj = context.active_object
+
+        if PolyhedralSplines.polyhedral_splines_finished:
+            # Store references
             SurfaceMesh.control_mesh_obj = obj
+            SurfaceMesh.control_mesh_name = obj.name
             SurfaceMesh.patch_to_corners = PolyhedralSplines.patch_to_corners
             SurfaceMesh.verts = PolyhedralSplines.verts
             SurfaceMesh.full_verts = PolyhedralSplines.full_verts
-            return True
-        return False
 
-    def distance(p1, p2):
-        return ((p1[0] - p2[0]) ** 2 + (p1[1] - p2[1]) ** 2 + (p1[2] - p2[2]) ** 2) ** 0.5
-    
-    def delta_location(original_location, new_location):
-        return new_location - original_location
-
-    # Harry addition to test modifying mesh
-    def mesh_modification(vertex_index, delta_location):
-        control_mesh = bpy.data.objects[SurfaceMesh.control_mesh_name]
-
-        bpy.ops.object.mode_set(mode='OBJECT')
-
-        bm = bmesh.new()
-        bm.from_mesh(control_mesh.data)
-        bm.verts.ensure_lookup_table()
-
-        # undo the rotation from the original location
-        # original_location[1], original_location[2] = original_location[2], -original_location[1]
-
-        print("Before the locations are changed")
-        print(bm.verts[vertex_index].co)
-
-        if 0 <= vertex_index < len(bm.verts):
-            bpy.context.view_layer.depsgraph.update()  # Disable updates
-            bm.verts[vertex_index].co += delta_location
-            bpy.context.view_layer.update()  # Re-enable updates
-            assert bm.verts[vertex_index].is_valid, "Control point is invalid!"
+            # Create the surface mesh
+            SurfaceMesh.create_wireframe_mesh(context)
+            self.report({'INFO'}, "Surface mesh created")
+            return {'FINISHED'}
         else:
-            print(f"Invalid vertex_index: {vertex_index}")
-
-        print("After the locations are changed")
-        print(bm.verts[vertex_index].co)
-        print("---------------------------------------------")
-
-        bm.to_mesh(control_mesh.data)
-        bm.free()
-
-        control_mesh.data.update()
-
-        bpy.ops.object.mode_set(mode='EDIT')
-
-
-    def execute(self, context):
-        # Perform some action
-        obj = context.active_object
-        self.report({'INFO'}, "Button Pressed")
-        print("Button Pressed")
-        print("Polyhedral Splines Finished:", PolyhedralSplines.polyhedral_splines_finished)
-        if PolyhedralSplines.polyhedral_splines_finished:
-            # fixed
-            # SurfaceMesh.mesh_modification()
-            # PolyhedralSplines.coverage_test()
-            self.create_wireframe_mesh(context)
-        return {'FINISHED'}
+            self.report({'INFO'}, "Surface mesh already created")
+            return {'CANCELLED'}
 
     @staticmethod
     def create_wireframe_mesh(context):
+        """Creates the wireframe mesh that users will interact with."""
+        # Create new mesh
         mesh = bpy.data.meshes.new(name="WireframeMesh")
-
-        # Dictionary to store unique vertices
         vert_dict = {}
         verts = []
         edges = set()
 
-        # Function to add a vertex and return its index
+        # Create a rotation matrix to fix the weird blender rotation with new mesh
+        rotation_matrix = Matrix.Rotation(math.radians(90), 4, 'X')
+
         def add_vertex(vertex):
+            """Helper function to add a vertex to the mesh."""
             vertex_tuple = tuple(vertex)
             if vertex_tuple not in vert_dict:
                 vert_dict[vertex_tuple] = len(verts)
                 verts.append(vertex_tuple)
             return vert_dict[vertex_tuple]
 
-        # Process regular faces first
         face_verts = []
         for face, face_type, parent in SurfaceMesh.full_verts:
             if face_type == "Regular":
-                # Rotate vertex: [x, y, z] -> [x, -z, y]
                 for vert in face:
-                    rotated_vertex = np.array([vert[0], -vert[2], vert[1]])
-                    # rotated_vertex = np.array([vert[0], vert[1], vert[2]])
-                    # rotated_vertex = np.array([rotated_vertex[0], rotated_vertex[2], -rotated_vertex[1]])
-                    # Add vertex and get its index
-                    # rotated_vertex = np.array([vert[0], -vert[1], -vert[2]])
+                    # Fixing the rotation of the vertices
+                    rotated_vertex = rotation_matrix @ Vector(vert)
                     vert_index = add_vertex(rotated_vertex)
                     face_verts.append(vert_index)
-                
-                # If we have collected 4 vertices for a face
                 if len(face_verts) == 4:
-                    # Add edges for the face
-                    edges.add((face_verts[0], face_verts[1]))
-                    edges.add((face_verts[0], face_verts[2]))
-                    edges.add((face_verts[1], face_verts[3]))
-                    edges.add((face_verts[2], face_verts[3]))
-                    # Reset face_verts for the next face
-                    face_verts = [] 
-        
-        edges_list = list(edges)
+                    edges.update({
+                        (face_verts[0], face_verts[1]),
+                        (face_verts[1], face_verts[3]),
+                        (face_verts[3], face_verts[2]),
+                        (face_verts[2], face_verts[0])
+                    })
+                    face_verts = []
 
-        # Create mesh data
-        mesh.from_pydata(verts, edges_list, [])
-
-        # Update mesh
+        # Create the mesh with the vertices and edges
+        mesh.from_pydata(verts, list(edges), [])
         mesh.update()
 
-        sbm = bmesh.new()
-        sbm.from_mesh(mesh)
-        sbm.verts.ensure_lookup_table()
-        sbm.faces.ensure_lookup_table()
+        # Create attribute to hold the near by control points
+        cp_idx_layers = []
+        for i in range(4):
+            layer_name = f"cp_idx_{i}"
+            if layer_name not in mesh.attributes:
+                mesh.attributes.new(name=layer_name, type='INT', domain='POINT')
+            cp_idx_layers.append(mesh.attributes[layer_name])
 
-        # using float_color to store control points because it can store 4 values
-
+        # Get control mesh object
         SurfaceMesh.control_mesh_name = SurfaceMesh.control_mesh_obj.name
-        # SurfaceMesh.control_mesh_obj.hide_viewport = True
-
         control_mesh = bpy.data.objects[SurfaceMesh.control_mesh_name]
 
         bpy.ops.object.mode_set(mode='OBJECT')
 
+        # Create a BMesh from the control mesh
         cbm = bmesh.new()
         cbm.from_mesh(control_mesh.data)
         cbm.verts.ensure_lookup_table()
 
-        # undo the rotation from the original location
+        # Get the control points in world space and rotate them
+        control_coords = [rotation_matrix @ cvert.co.copy() for cvert in cbm.verts]
 
-        control_points_layer = sbm.verts.layers.float_color.new("control_points")
-        
-        for svert in sbm.verts:   
-            closest_vert_indices = []
-            # undo rotation from the original location
-            sverttemp = Vector((svert.co[0], svert.co[2], -svert.co[1]))
-            # sverttemp = Vector((svert.co[0], svert.co[1], svert.co[2]))
-            for _ in range(4):
-                min_distance = float('inf')
-                closest_vert_index = None
-                for i, cvert in enumerate(cbm.verts):
-                    if i not in closest_vert_indices:
-                        dist = (cvert.co - sverttemp).length
-                        if dist < min_distance:
-                            min_distance = dist
-                            closest_vert_index = i
-                if closest_vert_index is not None:
-                    closest_vert_indices.append(closest_vert_index)
-            svert[control_points_layer] = [closest_vert_index for closest_vert_index in closest_vert_indices]
+        for svert_idx, svert_co in enumerate(mesh.vertices):
+            svert_co = svert_co.co.copy() # pre rotated
 
+            # Find the closest control points
+            distances = [(i, (svert_co - c_co).length) for i, c_co in enumerate(control_coords)]
+            distances.sort(key=lambda x: x[1])
+            closest_indeces = [i for i, _ in distances[:4]]
 
-        cmesh = bpy.context.active_object.data
-        cbm.to_mesh(cmesh)
+            # Store the indeces
+            for i, cp_idx in enumerate(closest_indeces):
+                mesh.attributes[f"cp_idx_{i}"].data[svert_idx].value = cp_idx
+
         cbm.free()
+        
+        # Create and link the wireframe mesh object
+        SurfaceMesh._link_mesh_to_scene(context, mesh)
 
-        # Create a new object with the mesh data
-        sbm.to_mesh(mesh)
-        sbm.free()
+    @staticmethod
+    def _link_mesh_to_scene(context, mesh):
+        """Link the created wireframe mesh to the current scene."""
         obj = bpy.data.objects.new(name="SurfaceMesh", object_data=mesh)
-
-        # Link object to the current collection
-        bpy.context.collection.objects.link(obj)
-
-
-        # Set the object as active and select it
-        bpy.context.view_layer.objects.active = obj
+        context.collection.objects.link(obj)
+        context.view_layer.objects.active = obj
         obj.select_set(True)
-
         obj.display_type = 'WIRE'
         SurfaceMesh.wireframe_mesh_created = True
-        # Optionally, clear the list after creating the mesh
-        # PolyhedralSplines.wireframe_vertices.clear()
-        # SurfaceMesh.mesh_modification(300, Vector((2, 2, 2)))
 
-# bpy.types.WindowManager.previous_vertex_idx = bpy.props.IntProperty(name="Previous Vertex Index", default=-1)
-persistent_data = {
-    "prev_idx":-1,
-    "prev_loc": None,
-    "delta_loc": Vector((0, 0, 0,)),
-    "delta_sum": Vector((0, 0, 0)),
-    "suppress_handler": False
-}
+class SurfaceMeshUpdaterModal(bpy.types.Operator):
+    """Modal operator to update control mesh in real-time"""
+    bl_idname = "object.surface_mesh_updater_modal"
+    bl_label = "Surface Mesh Updater Modal"
 
-@persistent
-def edit_object_change_handler(scene, context):
+    _timer = None
+    _surface_obj = None
+    _control_obj = None
+    _prev_positions = {}
 
-    if persistent_data["suppress_handler"]:
-        return
+    def execute(self, context):
+        """Initialize the modal operator"""
+        print(f"Surface Mesh Updater Modal Started")
+        self._surface_obj = bpy.data.objects.get("SurfaceMesh")
+        if not self._surface_obj:
+            print("SurfaceMesh object not found")
+            return {'CANCELLED'}
 
-    obj = bpy.context.active_object
+        self._control_obj = bpy.data.objects.get(SurfaceMesh.control_mesh_name)
+        if not self._control_obj:
+            self.reoprt({'ERROR'}, "Control mesh not found")
+            print("Control mesh not found")
+            return {'CANCELLED'}
 
-    if scene.previous_object:
-        prev_obj = scene.previous_object
-    else:
-        prev_obj = None
+        # Store initial positions
+        bm = bmesh.from_edit_mesh(self._surface_obj.data)
+        bm.verts.ensure_lookup_table()
+        self._prev_positions = {v.index: v.co.copy() for v in bm.verts}
 
-    # Update the previously selected object
-    scene.previous_object = obj
+        # Add a timer (think of like tick rate in a game loop so we have 100 ticks per second)
+        wm = context.window_manager
+        self._timer = wm.event_timer_add(0.01, window=context.window)
+        wm.modal_handler_add(self)
+        return {'RUNNING_MODAL'}
 
-    if obj is None:
-        return None
+    def modal(self, context, event):
+        """Handles modal events"""
+        if event.type == 'TIMER':
+            # Check if still in Edit Mode
+            if self._surface_obj.mode != 'EDIT':
+                self.cancel(context)
+                return {'CANCELLED'}
 
-    if bpy.context.scene.polyhedral_splines_finished and SurfaceMesh.wireframe_mesh_created and obj.type == 'MESH' and obj.name == "SurfaceMesh":
-        if obj.mode == 'EDIT':
-            persistent_data["suppress_handler"] = True
-            surface_mesh_obj = bpy.context.active_object
-            bm = bmesh.from_edit_mesh(obj.data)
+            # Access the BMesh in Edit Mode
+            bm = bmesh.from_edit_mesh(self._surface_obj.data)
             bm.verts.ensure_lookup_table()
-            bm.faces.ensure_lookup_table()
+            current_positions = {v.index: v.co.copy() for v in bm.verts}
 
-            # control poiints layer are stored as float color because it can store 4 values
-            # as a parameter of a vertex
-            control_points_layer = bm.verts.layers.float_color["control_points"]
+            moved_verts = []
+            for idx, curr_pos in current_positions.items():
+                prev_pos = self._prev_positions.get(idx)
+                if prev_pos and (curr_pos - prev_pos).length > 1e-6:
+                    delta = curr_pos - prev_pos
+                    moved_verts.append((idx, delta))
+                    self._prev_positions[idx] = curr_pos.copy()
 
-            # the loop tracks to see if the same vertex is being selected and moved
-            # if so, we want to keep track of the delta location
-            # so we can update the mesh accordingly
-            # updating live doesn't seem to work however as it causes to many updates
-            # so we will wait until the user is done moving the vertex
-            # note: this happens even with the suppress_handler flag
-            for v in bm.verts:
-                if v.select:
-                    if persistent_data["prev_loc"] is None:
-                        persistent_data["prev_loc"] = v.co.copy()
-                        persistent_data["prev_idx"] = v.index
-                    elif persistent_data["prev_idx"] != v.index:
-                        persistent_data["prev_loc"] = v.co.copy()
-                        persistent_data["delta_loc"] = Vector((0, 0, 0))
-                        persistent_data["prev_idx"] = v.index
-                    elif persistent_data["prev_idx"] == v.index:
-                        persistent_data["delta_loc"] = SurfaceMesh.delta_location(original_location=persistent_data["prev_loc"], new_location=v.co)
-                        persistent_data["delta_loc"] = Vector((persistent_data["delta_loc"][0], persistent_data["delta_loc"][2], -persistent_data["delta_loc"][1]))
-                        persistent_data["prev_loc"] = v.co.copy()
-                        persistent_data["prev_idx"] = v.index
-                    break
-            delta_mag = sum(abs(coord) for coord in persistent_data["delta_loc"])
-            if delta_mag != 0:
-                persistent_data["delta_sum"] += persistent_data["delta_loc"]
-            elif delta_mag == 0 and persistent_data["delta_sum"] != Vector((0, 0, 0)):
-                control_points = v[control_points_layer].copy()
-                print(f"delta sum (total change being applied): {persistent_data['delta_sum']}")
-                print(f"Control points to be modified: {control_points}")
-                for control_point_index in control_points:
-                    print(f"control point getting modified: {int(control_point_index)}")
-                    # persistent_data["suppress_handler"] = True
-                    SurfaceMesh.mesh_modification(int(control_point_index), persistent_data["delta_sum"])
-                    # persistent_data["suppress_handler"] = False
-                persistent_data["delta_loc"] = Vector((0, 0, 0))
-                persistent_data["delta_sum"] = Vector((0, 0, 0))
-            persistent_data["suppress_handler"] = False
+            if moved_verts:
+                # Apply deltas to control mesh
+                self.apply_deltas_to_control_mesh(moved_verts)
 
-bpy.app.handlers.depsgraph_update_post.append(edit_object_change_handler)
+        return {'PASS_THROUGH'}
+
+    def apply_deltas_to_control_mesh(self, moved_verts):
+        """Apply surface mesh vertex deltas to its related control mesh vertices"""
+        surface_obj = self._surface_obj
+
+        # Get the BMesh in Edit Mode
+        bm = bmesh.from_edit_mesh(surface_obj.data)
+        bm.verts.ensure_lookup_table()
+
+        # Get the integer layers (custom attributes) from the BMesh
+        cp_idx_layers = []
+        for i in range(4):
+            layer_name = f"cp_idx_{i}"
+            layer = bm.verts.layers.int.get(layer_name)
+            if layer is None:
+                layer = bm.verts.layers.int.new(layer_name)
+                attr_data = surface_obj.data.attributes[layer_name].data
+                for j, vert in enumerate(bm.verts):
+                    vert[layer] = attr_data[j].value
+            cp_idx_layers.append(layer)
+
+        control_mesh_obj = self._control_obj
+        if not control_mesh_obj:
+            print("Error: Control mesh not found")
+            return
+
+        control_mesh = control_mesh_obj.data
+        bm_control = bmesh.new()
+        bm_control.from_mesh(control_mesh)
+        bm_control.verts.ensure_lookup_table()
+
+        control_vertex_deltas = {}
+
+        control_matrix_inv = control_mesh_obj.matrix_world.inverted()
+
+        # For each moved vertex in the surface mesh, apply the delta to the control mesh
+        for bm_vert_idx, delta in moved_verts:
+            bm_vert = bm.verts[bm_vert_idx]
+
+            # Get control mesh vertices from the custom layer
+            cp_indices = []
+            for layer in cp_idx_layers:
+                cp_idx = bm_vert[layer]
+                cp_indices.append(cp_idx)
+
+            # Apply the delta in local space
+            delta_local = control_matrix_inv.to_3x3() @ delta
+
+            # Accumulate the delta for each control vertex
+            for cp_idx in cp_indices:
+                if cp_idx not in control_vertex_deltas:
+                    control_vertex_deltas[cp_idx] = delta_local.copy()
+                else:
+                    control_vertex_deltas[cp_idx] += delta_local
+
+        # Apply the accumulated deltas to the control mesh
+        for cp_idx, delta in control_vertex_deltas.items():
+            control_vert = bm_control.verts[cp_idx]
+            control_vert.co += delta
+
+        # Update the control mesh
+        bm_control.to_mesh(control_mesh)
+        control_mesh.update()
+        bm_control.free()
+
+    def cancel(self, context):
+        """Cancel the modal operator"""
+        print(f"Surface Mesh Updater Modal Cancelled")
+        wm = context.window_manager
+        if self._timer:
+            wm.event_timer_remove(self._timer)
+        return {'CANCELLED'}
+
+class StartSurfaceMeshUpdater(bpy.types.Operator):
+    """Start the Surface Mesh Updater Modal"""
+    bl_idname = "object.start_surface_mesh_updater"
+    bl_label = "Start Surface Mesh Updater"
+    bl_description = "Starts the updater to synchronize the surface mesh with the control mesh in real-time"
+
+    @classmethod
+    def poll(cls, context):
+        """Make sure the operator can be run"""
+        obj = context.active_object
+        return (
+            obj is not None and
+            obj.type == 'MESH' and
+            obj.mode == 'EDIT' and
+            obj.name == "SurfaceMesh" and
+            PolyhedralSplines.polyhedral_splines_finished and
+            SurfaceMesh.wireframe_mesh_created
+        )
+
+    def execute(self, context):
+        """Start the modal operator"""
+        bpy.ops.object.surface_mesh_updater_modal()
+        return {'FINISHED'}

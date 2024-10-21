@@ -4,7 +4,7 @@ from .polyhedral_splines import PolyhedralSplines
 from .ui_color import COLOR_OT_TemplateOperator
 from .moments import Moments
 from .ui_helper import ToggleFaces, ToggleSurfPatchCollection
-from .surface_mesh import SurfaceMesh
+from .surface_mesh import SurfaceMesh, StartSurfaceMeshUpdater
 import bpy
 
 
@@ -30,6 +30,9 @@ class MainUI(bpy.types.Panel):
         calculationBox.operator(operator=SubdivideMesh.bl_idname, text="Subdivide Mesh")
         calculationBox.operator(operator=Moments.bl_idname, text="Calculate Moments")
         calculationBox.operator(operator=SurfaceMesh.bl_idname, text="Create Surface Mesh")
+
+        # new button
+        calculationBox.operator(operator=StartSurfaceMeshUpdater.bl_idname, text="Start Surface Mesh Updater")
 
         viewBox = layout.box()
         viewBox.label(text="View")

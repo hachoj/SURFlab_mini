@@ -163,7 +163,7 @@ class PatchHelper:
             valence = Helper.edges_number_of_face(patchWrapper.source)
             mask = Reader.csv_to_masks(["ngonSct{}".format(valence)])["ngonSct{}".format(valence)]
             bezier_coefs = Helper.apply_mask_on_neighbor_verts(mask, nb_verts)
-            for coef in range(0, len(bezier_coefs)-16, 16):
+            for coef in range(0, len(bezier_coefs)-1, 16):
                 corner_coords.append(bezier_coefs[coef])
                 corner_coords.append(bezier_coefs[coef+3])
                 corner_coords.append(bezier_coefs[coef+12])
