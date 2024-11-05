@@ -2,6 +2,7 @@ import bpy
 import bmesh
 from bpy.app.handlers import persistent
 from .polyhedral_splines import PolyhedralSplines
+from .polyhedral_splines import update_surface
 
 import numpy as np
 import math
@@ -57,6 +58,87 @@ class SurfaceMesh(bpy.types.Operator):
         else:
             self.report({'INFO'}, "Surface mesh already created")
             return {'CANCELLED'}
+    
+    # @staticmethod
+    # def create_wireframe_mesh(context):
+    #     """Creates the wireframe mesh that users will interact with."""
+    #     # Create new mesh
+    #     mesh = bpy.data.meshes.new(name="WireframeMesh")
+    #     vert_dict = {}
+    #     verts = []
+    #     edges = set()
+
+    #     # Create a rotation matrix to fix the orientation
+    #     rotation_matrix = Matrix.Rotation(math.radians(90), 4, 'X')
+
+    #     def add_vertex(vertex):
+    #         """Helper function to add a vertex to the mesh."""
+    #         vertex_tuple = tuple(vertex)
+    #         if vertex_tuple not in vert_dict:
+    #             vert_dict[vertex_tuple] = len(verts)
+    #             verts.append(vertex_tuple)
+    #         return vert_dict[vertex_tuple]
+
+    #     # Process all patches
+    #     for face, face_type, parent in SurfaceMesh.full_verts:
+    #         face_verts = []
+    #         for vert in face:
+    #             # Rotate the vertices
+    #             rotated_vertex = rotation_matrix @ Vector(vert)
+    #             vert_index = add_vertex(rotated_vertex)
+    #             face_verts.append(vert_index)
+
+    #         # Create edges based on the face structure
+    #         num_verts = len(face_verts)
+    #         if num_verts >= 3:
+    #             # Create edges for n-gon faces
+    #             for i in range(num_verts):
+    #                 edge = (face_verts[i], face_verts[(i + 1) % num_verts])
+    #                 edges.add(edge)
+
+    #     # Create the mesh with the vertices and edges
+    #     mesh.from_pydata(verts, list(edges), [])
+    #     mesh.update()
+
+    #     # Create attribute to hold the nearby control points
+    #     cp_idx_layers = []
+    #     for i in range(4):
+    #         layer_name = f"cp_idx_{i}"
+    #         if layer_name not in mesh.attributes:
+    #             mesh.attributes.new(name=layer_name, type='INT', domain='POINT')
+    #         cp_idx_layers.append(mesh.attributes[layer_name])
+
+    #     # Get control mesh object
+    #     SurfaceMesh.control_mesh_name = SurfaceMesh.control_mesh_obj.name
+    #     control_mesh = bpy.data.objects[SurfaceMesh.control_mesh_name]
+
+    #     bpy.ops.object.mode_set(mode='OBJECT')
+
+    #     # Create a BMesh from the control mesh
+    #     cbm = bmesh.new()
+    #     cbm.from_mesh(control_mesh.data)
+    #     cbm.verts.ensure_lookup_table()
+
+    #     # Get the control points in world space and rotate them
+    #     control_coords = [rotation_matrix @ cvert.co.copy() for cvert in cbm.verts]
+
+    #     # Assign control point indices to each vertex in the surface mesh
+    #     for svert_idx, svert_co in enumerate(mesh.vertices):
+    #         svert_co = svert_co.co.copy()  # Pre-rotated
+
+    #         # Find the closest control points
+    #         distances = [(i, (svert_co - c_co).length) for i, c_co in enumerate(control_coords)]
+    #         distances.sort(key=lambda x: x[1])
+    #         closest_indices = [i for i, _ in distances[:4]]
+
+    #         # Store the indices
+    #         for i, cp_idx in enumerate(closest_indices):
+    #             mesh.attributes[f"cp_idx_{i}"].data[svert_idx].value = cp_idx
+
+    #     cbm.free()
+
+    #     # Create and link the wireframe mesh object
+    #     SurfaceMesh._link_mesh_to_scene(context, mesh)
 
     @staticmethod
     def create_wireframe_mesh(context):
@@ -179,7 +261,7 @@ class SurfaceMeshUpdaterModal(bpy.types.Operator):
 
         # Add a timer (think of like tick rate in a game loop so we have 100 ticks per second)
         wm = context.window_manager
-        self._timer = wm.event_timer_add(0.01, window=context.window)
+        self._timer = wm.event_timer_add((1/60), window=context.window)
         wm.modal_handler_add(self)
         return {'RUNNING_MODAL'}
 
@@ -241,6 +323,7 @@ class SurfaceMeshUpdaterModal(bpy.types.Operator):
         bm_control.verts.ensure_lookup_table()
 
         control_vertex_deltas = {}
+        updated_control_verts = set()
 
         control_matrix_inv = control_mesh_obj.matrix_world.inverted()
 
@@ -259,6 +342,7 @@ class SurfaceMeshUpdaterModal(bpy.types.Operator):
 
             # Accumulate the delta for each control vertex
             for cp_idx in cp_indices:
+                updated_control_verts.add(cp_idx)
                 if cp_idx not in control_vertex_deltas:
                     control_vertex_deltas[cp_idx] = delta_local.copy()
                 else:
@@ -273,6 +357,21 @@ class SurfaceMeshUpdaterModal(bpy.types.Operator):
         bm_control.to_mesh(control_mesh)
         control_mesh.update()
         bm_control.free()
+
+        # After updating the control mesh, trigger spline reevaluation for updated control vertices
+        self.update_spline_surface(updated_control_verts)
+
+    def update_spline_surface(self, updated_control_verts):
+        """Update the spline surface to reflect changes in the control mesh."""
+        control_mesh_obj = self._control_obj
+
+        # Ensure the control mesh object exists
+        if not control_mesh_obj:
+            print("Error: Control mesh not found")
+            return
+
+        # Call the update_surface function with the updated control vertices
+        update_surface(bpy.context, control_mesh_obj, updated_control_verts)
 
     def cancel(self, context):
         """Cancel the modal operator"""
