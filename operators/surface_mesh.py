@@ -8,6 +8,8 @@ import numpy as np
 import math
 from mathutils import Vector, Matrix
 
+#TODO: look at open mesh half edge thing to track iterator through the stuff and stuff
+
 class SurfaceMesh(bpy.types.Operator):
     """Operator to create a surface mesh from the control mesh"""
     bl_label = "Surface Mesh"
