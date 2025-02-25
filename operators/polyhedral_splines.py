@@ -234,51 +234,99 @@ def edit_object_change_handler(scene, context):
 
     return None
 
+def update_surface(context, obj, updated_control_verts=None):
+    """Update the spline patches based on the control mesh."""
+    # Ensure we're working with the correct object
+    if obj is None or obj.type != 'MESH':
+        return
 
-def update_surface(context, obj):
-    bm = bmesh.from_edit_mesh(obj.data)
-    selected_verts = [v for v in bm.verts if v.select]
+    # Create a BMesh from the control mesh data
+    bm = bmesh.new()
+    bm.from_mesh(obj.data)
+    bm.verts.ensure_lookup_table()
+    bm.faces.ensure_lookup_table()
 
-    for sv in selected_verts:
-        bmesh.update_edit_mesh(obj.data)
+    if updated_control_verts is not None:
+        # Process only the updated vertices
+        vertices_to_process = [bm.verts[i] for i in updated_control_verts]
+    else:
+        # Get selected vertices
+        vertices_to_process = [v for v in bm.verts if v.select]
 
-        # Get the centrol vert that needed to be updated
+    # For each vertex to process
+    for sv in vertices_to_process:
+        # Get central verts and faces
         central_vert_IDs = PatchTracker.get_central_vert_ID(sv)
         vpatch_names = PatchTracker.get_vert_based_patch_obj_name(sv)
         central_face_IDs = PatchTracker.get_central_face_ID(sv)
         fpatch_names = PatchTracker.get_face_based_patch_obj_name(sv)
 
-        bm.verts.ensure_lookup_table()
-        bm.faces.ensure_lookup_table()
-
-        if central_face_IDs is not False and fpatch_names is not False:
-            i = 0
-            while i < len(central_face_IDs):
-                for pc in Algorithms.face_patch_constructors:
-                    if i >= len(central_face_IDs):
-                        break
-                    if not pc.is_same_type(bm.faces[central_face_IDs[i]]):
-                        continue
-                    bspline_patches = pc.get_patch(bm.faces[central_face_IDs[i]])
-                    for bc in bspline_patches.bspline_coefs:
-                        PatchOperator.update_patch_obj(fpatch_names[i], bc)
-                        i = i + 1
-
-        if central_vert_IDs is not False and vpatch_names is not False:
-            i = 0
-            while i < len(central_vert_IDs):
+        # Update vert-based patches
+        if central_vert_IDs and vpatch_names:
+            for i, vert_id in enumerate(central_vert_IDs):
+                vert = bm.verts[vert_id]
                 for pc in Algorithms.vert_patch_constructors:
-                    if i >= len(central_vert_IDs):
-                        break
-                    if not pc.is_same_type(bm.verts[central_vert_IDs[i]]):
-                        continue
-                    bspline_patches = pc.get_patch(bm.verts[central_vert_IDs[i]])
-                    for bc in bspline_patches.bspline_coefs:
-                        PatchOperator.update_patch_obj(vpatch_names[i], bc)
-                        i = i + 1
+                    if pc.is_same_type(vert):
+                        bspline_patches = pc.get_patch(vert)
+                        for bc in bspline_patches.bspline_coefs:
+                            PatchOperator.update_patch_obj(vpatch_names[i], bc)
 
-    facePatchList = list(PatchTracker.fpatch_LUT)
-    vertexPatchList = list(PatchTracker.vpatch_LUT)
+        # Update face-based patches
+        if central_face_IDs and fpatch_names:
+            for i, face_id in enumerate(central_face_IDs):
+                face = bm.faces[face_id]
+                for pc in Algorithms.face_patch_constructors:
+                    if pc.is_same_type(face):
+                        bspline_patches = pc.get_patch(face)
+                        for bc in bspline_patches.bspline_coefs:
+                            PatchOperator.update_patch_obj(fpatch_names[i], bc)
+
+    bm.free()
+
+# def update_surface(context, obj):
+#     bm = bmesh.from_edit_mesh(obj.data)
+#     selected_verts = [v for v in bm.verts if v.select]
+
+#     for sv in selected_verts:
+#         bmesh.update_edit_mesh(obj.data)
+
+#         # Get the centrol vert that needed to be updated
+#         central_vert_IDs = PatchTracker.get_central_vert_ID(sv)
+#         vpatch_names = PatchTracker.get_vert_based_patch_obj_name(sv)
+#         central_face_IDs = PatchTracker.get_central_face_ID(sv)
+#         fpatch_names = PatchTracker.get_face_based_patch_obj_name(sv)
+
+#         bm.verts.ensure_lookup_table()
+#         bm.faces.ensure_lookup_table()
+
+#         if central_face_IDs is not False and fpatch_names is not False:
+#             i = 0
+#             while i < len(central_face_IDs):
+#                 for pc in Algorithms.face_patch_constructors:
+#                     if i >= len(central_face_IDs):
+#                         break
+#                     if not pc.is_same_type(bm.faces[central_face_IDs[i]]):
+#                         continue
+#                     bspline_patches = pc.get_patch(bm.faces[central_face_IDs[i]])
+#                     for bc in bspline_patches.bspline_coefs:
+#                         PatchOperator.update_patch_obj(fpatch_names[i], bc)
+#                         i = i + 1
+
+#         if central_vert_IDs is not False and vpatch_names is not False:
+#             i = 0
+#             while i < len(central_vert_IDs):
+#                 for pc in Algorithms.vert_patch_constructors:
+#                     if i >= len(central_vert_IDs):
+#                         break
+#                     if not pc.is_same_type(bm.verts[central_vert_IDs[i]]):
+#                         continue
+#                     bspline_patches = pc.get_patch(bm.verts[central_vert_IDs[i]])
+#                     for bc in bspline_patches.bspline_coefs:
+#                         PatchOperator.update_patch_obj(vpatch_names[i], bc)
+#                         i = i + 1
+
+#     facePatchList = list(PatchTracker.fpatch_LUT)
+#     vertexPatchList = list(PatchTracker.vpatch_LUT)
 
 
 bpy.app.handlers.depsgraph_update_post.append(edit_object_change_handler)

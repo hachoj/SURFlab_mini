@@ -273,11 +273,11 @@ class Moments(bpy.types.Operator):
 def objectHandler(context):
     selected = bpy.context.selected_objects
 
-    # harry change remove later
-
-    if Moments.CurrentSelection not in selected:
-        Moments.cleanupObjects()
-        Moments.CurrentSelection = None
+    # harry change, may need to fix later
+    if hasattr(Moments, 'CurrentSelection'):
+        if Moments.CurrentSelection not in selected:
+            Moments.cleanupObjects()
+            Moments.CurrentSelection = None
 
     return None
 
